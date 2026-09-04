@@ -8,6 +8,13 @@
       "when": 1788532091679,
       "tag": "0000_stale_bromley",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788533397804,
+      "tag": "0001_shallow_magdalene",
+      "breakpoints": true
     }
   ]
 }
