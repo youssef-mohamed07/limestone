@@ -695,6 +695,46 @@ export default function LimestoneERP() {
           </div>
         )}
       </section>
+      <nav className="mobile-tabbar" aria-label="Mobile navigation">
+        <button
+          className={active === "Dashboard" && !detail ? "active" : ""}
+          onClick={() => {
+            setActive("Dashboard");
+            setDetail(null);
+          }}
+        >
+          <LayoutDashboard />
+          <span>Home</span>
+        </button>
+        <button
+          className={active === "Invoices" || detail ? "active" : ""}
+          onClick={() => {
+            setActive("Invoices");
+            setDetail(null);
+          }}
+        >
+          <FileText />
+          <span>Invoices</span>
+        </button>
+        <button className="mobile-new" onClick={() => setBuilder(true)}>
+          <Plus />
+          <span>New</span>
+        </button>
+        <button
+          className={active === "Shipments" ? "active" : ""}
+          onClick={() => {
+            setActive("Shipments");
+            setDetail(null);
+          }}
+        >
+          <Ship />
+          <span>Shipments</span>
+        </button>
+        <button onClick={() => setMobileNav(true)}>
+          <Menu />
+          <span>More</span>
+        </button>
+      </nav>
       {builder && (
         <InvoiceBuilder
           invoices={invoices}
@@ -891,27 +931,27 @@ function InvoiceTable({
             const t = totalOf(i);
             return (
               <tr key={i.id} onClick={() => onOpen(i)}>
-                <td>
+                <td data-label="Invoice">
                   <strong>PI-{i.number}</strong>
                 </td>
-                <td>
+                <td data-label="Customer">
                   <div className="customer-cell">
                     <span>{i.customer.slice(0, 2).toUpperCase()}</span>
                     {i.customer}
                   </div>
                 </td>
-                <td>{labelDate(i.date)}</td>
-                <td>
+                <td data-label="Date">{labelDate(i.date)}</td>
+                <td data-label="Amount">
                   <strong>{currency(t.grandTotalMinor, i.currency)}</strong>
                 </td>
-                <td>{currency(i.paidMinor, i.currency)}</td>
-                <td>{currency(t.grandTotalMinor - i.paidMinor, i.currency)}</td>
-                <td>
+                <td data-label="Paid">{currency(i.paidMinor, i.currency)}</td>
+                <td data-label="Balance">{currency(t.grandTotalMinor - i.paidMinor, i.currency)}</td>
+                <td data-label="Status">
                   <span className={`status ${statusClass(i.status)}`}>
                     {i.status}
                   </span>
                 </td>
-                <td>
+                <td data-label="Actions">
                   <div className="table-actions">
                     {onDuplicate && (
                       <button
@@ -1898,7 +1938,7 @@ function EntityPage({
             {shown.map((r, n) => (
               <tr key={n}>
                 {r.map((v, i) => (
-                  <td key={i}>
+                  <td key={i} data-label={columns[i]}>
                     {i === 0 ? (
                       <strong>{v}</strong>
                     ) : i === r.length - 1 ? (
@@ -1908,7 +1948,7 @@ function EntityPage({
                     )}
                   </td>
                 ))}
-                <td>
+                <td data-label="Actions">
                   <button className="row-menu">•••</button>
                 </td>
               </tr>
