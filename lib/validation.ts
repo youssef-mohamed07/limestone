@@ -1,0 +1,3 @@
+import{z}from'zod';
+export const invoiceItemSchema=z.object({description:z.string().trim().min(1),finish:z.string().trim(),size:z.string().trim(),quantity:z.number().positive(),unit:z.enum(['m²','m³','pcs','ton','kg','crate']),unitPriceMinor:z.number().int().nonnegative(),hsCode:z.string().trim().optional(),crates:z.number().int().nonnegative().optional()});
+export const invoiceSchema=z.object({number:z.string().trim().min(1),invoiceDate:z.string().date(),customerId:z.string().min(1),currency:z.enum(['USD','EUR','GBP','EGP']),containerQuantity:z.number().int().nonnegative(),freightPerContainerMinor:z.number().int().nonnegative(),downPaymentPercent:z.number().min(0).max(100),items:z.array(invoiceItemSchema).min(1)});
