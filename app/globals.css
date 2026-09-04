@@ -2519,6 +2519,12 @@ svg {
 .settings-form {
   padding: 23px;
 }
+.settings-loading {
+  grid-column: 1 / -1;
+  padding: 28px;
+  color: #77756e;
+  font-size: 11px;
+}
 .settings-head {
   display: flex;
   justify-content: space-between;
@@ -4501,6 +4507,53 @@ td {
   font-size: 9px;
 }
 
+.member-add {
+  display: grid;
+  grid-template-columns: 1fr 1.35fr 0.85fr auto;
+  gap: 10px;
+  align-items: end;
+  padding: 14px;
+  margin-bottom: 12px;
+  border: 1px solid #e9e7df;
+  border-radius: 14px;
+  background: #faf9f6;
+}
+
+.member-add .field {
+  margin: 0;
+}
+
+.member-add-button {
+  min-height: 42px;
+  white-space: nowrap;
+}
+
+.member-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.member-actions select {
+  min-width: 112px;
+  height: 34px;
+  padding: 0 28px 0 10px;
+  border: 1px solid #dedbd2;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  font-size: 9px;
+}
+
+.audit-list > div > b {
+  padding: 5px 9px;
+  border-radius: 20px;
+  color: #7c6539;
+  background: #f3ecdd;
+  font-size: 8px;
+  text-transform: capitalize;
+}
+
 .settings-note {
   padding: 14px;
   color: #77756e;
@@ -4532,6 +4585,13 @@ button:disabled {
 .dark .audit-list > div {
   color: #efeee9;
   border-color: #3b3933;
+}
+
+.dark .member-add,
+.dark .member-actions select {
+  color: #efeee9;
+  border-color: #3b3933;
+  background: #292821;
 }
 .dark .excel-import-modal,
 .dark .import-result {
@@ -4671,6 +4731,32 @@ button:disabled {
   .settings-list > div,
   .audit-list > div {
     padding-inline: 12px;
+  }
+
+  .member-add {
+    grid-template-columns: 1fr;
+  }
+
+  .member-add-button {
+    width: 100%;
+  }
+
+  .settings-list > div {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .settings-list > div > p {
+    min-width: calc(100% - 52px);
+  }
+
+  .member-actions {
+    width: 100%;
+    padding-left: 48px;
+  }
+
+  .member-actions select {
+    flex: 1;
   }
 }
 

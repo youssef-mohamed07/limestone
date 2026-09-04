@@ -12,6 +12,8 @@ const catalogTypes = [
   "shipments",
   "documents",
   "settings",
+  "members",
+  "activity",
 ] as const;
 
 export async function GET() {

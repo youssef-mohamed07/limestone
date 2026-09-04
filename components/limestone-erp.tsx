@@ -3,6 +3,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
@@ -143,6 +144,19 @@ type CompanySettings = {
   bankIban: string;
   bankSwift: string;
 };
+type TeamMember = {
+  id: string;
+  name: string;
+  email: string;
+  role: "Owner" | "Administrator" | "Editor" | "Viewer";
+};
+type AuditEntry = {
+  id: string;
+  action: string;
+  area: string;
+  actor: string;
+  createdAt: string;
+};
 type CatalogData = {
   customers: Customer[];
   products: Product[];
@@ -150,6 +164,8 @@ type CatalogData = {
   shipments: string[][];
   documents: string[][];
   settings: CompanySettings;
+  members: TeamMember[];
+  activity: AuditEntry[];
 };
 const customers: Customer[] = [
   {
@@ -332,6 +348,14 @@ const seedSettings: CompanySettings = {
   bankIban: "EG070010019200000100073581782",
   bankSwift: "CIBEEGCX192",
 };
+const seedMembers: TeamMember[] = [
+  {
+    id: "owner-youssef",
+    name: "Youssef Mohamed",
+    email: "youssefmohamedfast@gmail.com",
+    role: "Owner",
+  },
+];
 const seedCatalog: CatalogData = {
   customers,
   products,
@@ -339,6 +363,8 @@ const seedCatalog: CatalogData = {
   shipments: seedShipments,
   documents: seedDocuments,
   settings: seedSettings,
+  members: seedMembers,
+  activity: [],
 };
 const CatalogContext = createContext<CatalogData>(seedCatalog);
 const nav = [
@@ -425,7 +451,11 @@ function AppPortal({ children }: { children: ReactNode }) {
     document.querySelector(".app-shell") ?? document.body,
   );
 }
-export default function LimestoneERP() {
+export default function LimestoneERP({
+  currentUser,
+}: {
+  currentUser: { name: string; email: string };
+}) {
   const [active, setActive] = useState("Dashboard");
   const [invoices, setInvoices] = useState(seedInvoices);
   const [query, setQuery] = useState("");
@@ -436,10 +466,47 @@ export default function LimestoneERP() {
   const [mobileNav, setMobileNav] = useState(false);
   const [dark, setDark] = useState(false);
   const [catalog, setCatalog] = useState<CatalogData>(seedCatalog);
+  const [catalogLoaded, setCatalogLoaded] = useState(false);
+  const activityRef = useRef<AuditEntry[]>(seedCatalog.activity);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const notify = (message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(""), 2600);
+  };
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const savedTheme = window.localStorage.getItem("limestone-theme");
+      setDark(savedTheme === "dark");
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
+    activityRef.current = catalog.activity;
+  }, [catalog.activity]);
+
+  const changeTheme = (value: boolean) => {
+    setDark(value);
+    window.localStorage.setItem("limestone-theme", value ? "dark" : "light");
+  };
+
+  const recordActivity = (action: string, area: string) => {
+    const entry: AuditEntry = {
+      id: crypto.randomUUID(),
+      action,
+      area,
+      actor: currentUser.name,
+      createdAt: new Date().toISOString(),
+    };
+    const nextActivity = [entry, ...activityRef.current].slice(0, 100);
+    activityRef.current = nextActivity;
+    setCatalog((current) => ({ ...current, activity: nextActivity }));
+    void fetch("/api/data", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ activity: nextActivity }),
+    }).catch(() => undefined);
   };
 
   useEffect(() => {
@@ -487,9 +554,18 @@ export default function LimestoneERP() {
           settings: result.data?.settings
             ? { ...current.settings, ...result.data.settings }
             : current.settings,
+          members: Array.isArray(result.data?.members)
+            ? result.data.members
+            : current.members,
+          activity: Array.isArray(result.data?.activity)
+            ? result.data.activity
+            : current.activity,
         }));
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => {
+        if (activeRequest) setCatalogLoaded(true);
+      });
     return () => {
       activeRequest = false;
     };
@@ -513,7 +589,10 @@ export default function LimestoneERP() {
         } | null;
         throw new Error(result?.error ?? "Unable to save data");
       })
-      .then(() => notify(successMessage))
+      .then(() => {
+        notify(successMessage);
+        if (key !== "activity") recordActivity(successMessage, String(key));
+      })
       .catch((error: unknown) =>
         notify(error instanceof Error ? error.message : "Unable to save data"),
       );
@@ -532,7 +611,10 @@ export default function LimestoneERP() {
         } | null;
         throw new Error(result?.error ?? "Unable to save invoice");
       })
-      .then(() => notify(successMessage))
+      .then(() => {
+        notify(successMessage);
+        recordActivity(successMessage, "invoices");
+      })
       .catch((error: unknown) =>
         notify(error instanceof Error ? error.message : "Unable to save invoice"),
       );
@@ -688,6 +770,10 @@ export default function LimestoneERP() {
     ]);
     setImporter(false);
     setActive("Invoices");
+    recordActivity(
+      `${importedInvoices.length} proforma${importedInvoices.length === 1 ? "" : "s"} imported from Excel`,
+      "invoices",
+    );
     notify(
       `${importedInvoices.length} proforma${importedInvoices.length === 1 ? "" : "s"} imported and saved`,
     );
@@ -729,6 +815,26 @@ export default function LimestoneERP() {
       Payments: catalog.payments,
       Shipments: catalog.shipments,
       Documents: catalog.documents,
+      Settings: [
+        ["Section", "Setting", "Value"],
+        ["Company", "Company name", catalog.settings.companyName],
+        ["Company", "Tagline", catalog.settings.tagline],
+        ["Company", "Email", catalog.settings.email],
+        ["Company", "Phone", catalog.settings.phone],
+        ["Company", "Tax card", catalog.settings.taxCard],
+        ["Company", "Commercial registration", catalog.settings.commercialRegistration],
+        ["Company", "Registered address", catalog.settings.address],
+        ["Invoice", "Currency", catalog.settings.currency],
+        ["Invoice", "Port of loading", catalog.settings.portLoading],
+        ["Invoice", "Down payment", `${catalog.settings.downPaymentPercent}%`],
+        ["Invoice", "Marble background", catalog.settings.marbleBackground ? "Enabled" : "Disabled"],
+        ["Bank", "Bank", catalog.settings.bankName],
+        ["Bank", "Branch", catalog.settings.bankBranch],
+        ["Bank", "Account number", catalog.settings.bankAccountNumber],
+        ["Bank", "IBAN", catalog.settings.bankIban],
+        ["Bank", "SWIFT / BIC", catalog.settings.bankSwift],
+        ...catalog.members.map((member) => ["Team", member.email, `${member.name} — ${member.role}`]),
+      ],
     };
     const rows = pageRows[active];
     if (rows) {
@@ -966,9 +1072,9 @@ export default function LimestoneERP() {
               />
             )}{" "}
             {active === "Settings" && (
-              <SettingsPage
+              catalogLoaded ? <SettingsPage
                 dark={dark}
-                setDark={setDark}
+                setDark={changeTheme}
                 notify={notify}
                 onSave={(settings) =>
                   persistCatalog(
@@ -977,7 +1083,14 @@ export default function LimestoneERP() {
                     "Company settings saved to Supabase",
                   )
                 }
-              />
+                onSaveMembers={(members) =>
+                  persistCatalog(
+                    "members",
+                    members,
+                    "Workspace members saved to Supabase",
+                  )
+                }
+              /> : <section className="panel settings-loading">Loading saved settings…</section>
             )}
           </div>
         )}
@@ -1659,8 +1772,8 @@ function InvoiceBuilder({
     portLoading: settings.portLoading,
     portDischarge: customers[0].port,
     notes: "Goods remain property of seller until full payment.",
-    commercialRegistration: "6724 / 9",
-    taxCard: "773-932-488",
+    commercialRegistration: settings.commercialRegistration,
+    taxCard: settings.taxCard,
     sellerName: settings.companyName,
     sellerAddress: settings.address,
     sellerPhone: settings.phone,
@@ -1672,10 +1785,10 @@ function InvoiceBuilder({
     netWeightKg: 26000,
     totalCrates: 114,
     incoterm: "CFR",
-    paymentTerms: "25% DOWN PAYMENT AND THE REST UPON RECEIPT OF DOCUMENTS",
+    paymentTerms: `${settings.downPaymentPercent}% DOWN PAYMENT AND THE REST UPON RECEIPT OF DOCUMENTS`,
     bankAccountNumber: settings.bankAccountNumber,
     bankIban: settings.bankIban,
-    bankCompanyName: "Limestone for Marble and Granite",
+    bankCompanyName: settings.companyName,
     bankName: settings.bankName,
     bankBranch: settings.bankBranch,
     bankSwift: settings.bankSwift,
@@ -2282,7 +2395,7 @@ function InvoicePaper({ invoice }: { invoice: Invoice }) {
     customer = customers.find((c) => c.id === invoice.customerId);
   return (
     <article className="invoice-paper reference-invoice">
-      <div className="marble" />
+      {settings.marbleBackground && <div className="marble" />}
       <header className="reference-header">
         <Logo />
         <div className="document-title">
@@ -2373,7 +2486,7 @@ function InvoicePaper({ invoice }: { invoice: Invoice }) {
         <div><span>BRANCH:</span><strong>{invoice.bankBranch ?? "Helwan"}</strong></div>
         <div><span>SWIFT CODE:</span><strong>{invoice.bankSwift ?? "CIBEEGCX192"}</strong></div>
       </section>
-      <footer className="reference-footer"><span>{invoice.notes}</span><b>Egyptian natural stone, exported with distinction.</b></footer>
+      <footer className="reference-footer"><span>{invoice.notes}</span><b>{settings.tagline}</b></footer>
     </article>
   );
 }
@@ -2921,14 +3034,20 @@ function SettingsPage({
   setDark,
   notify,
   onSave,
+  onSaveMembers,
 }: {
   dark: boolean;
   setDark: (v: boolean) => void;
   notify: (s: string) => void;
   onSave: (settings: CompanySettings) => void;
+  onSaveMembers: (members: TeamMember[]) => void;
 }) {
-  const { settings } = useContext(CatalogContext);
+  const { settings, members, activity } = useContext(CatalogContext);
   const [form, setForm] = useState(settings);
+  const [membersForm, setMembersForm] = useState(members);
+  const [memberName, setMemberName] = useState("");
+  const [memberEmail, setMemberEmail] = useState("");
+  const [memberRole, setMemberRole] = useState<TeamMember["role"]>("Editor");
   const [section, setSection] = useState("Company");
   const update = <K extends keyof CompanySettings>(
     key: K,
@@ -2937,6 +3056,29 @@ function SettingsPage({
   const saveSettings = () => {
     notify("Saving company settings…");
     onSave(form);
+  };
+  const saveMembers = (nextMembers: TeamMember[]) => {
+    setMembersForm(nextMembers);
+    onSaveMembers(nextMembers);
+  };
+  const addMember = () => {
+    const name = memberName.trim();
+    const email = memberEmail.trim().toLowerCase();
+    if (!name || !/^\S+@\S+\.\S+$/.test(email)) {
+      notify("Enter a valid member name and email");
+      return;
+    }
+    if (membersForm.some((member) => member.email.toLowerCase() === email)) {
+      notify("This email is already in the workspace directory");
+      return;
+    }
+    saveMembers([
+      ...membersForm,
+      { id: crypto.randomUUID(), name, email, role: memberRole },
+    ]);
+    setMemberName("");
+    setMemberEmail("");
+    setMemberRole("Editor");
   };
   const sectionCopy: Record<string, string> = {
     Company: "Details used throughout the app and on export documents.",
@@ -3028,22 +3170,62 @@ function SettingsPage({
           </>
         )}
         {section === "Users & roles" && (
-          <div className="settings-list">
-            <div><span className="avatar">YM</span><p><strong>Youssef Mohamed</strong><small>youssefmohamedfast@gmail.com</small></p><b>Owner</b></div>
-            <p className="settings-note">This Site is private and currently accessible only to the owner.</p>
-          </div>
+          <>
+            <div className="member-add">
+              <Field label="Name"><input value={memberName} onChange={(event) => setMemberName(event.target.value)} placeholder="Team member name" /></Field>
+              <Field label="Email"><input type="email" value={memberEmail} onChange={(event) => setMemberEmail(event.target.value)} placeholder="name@company.com" /></Field>
+              <Field label="Role">
+                <select value={memberRole} onChange={(event) => setMemberRole(event.target.value as TeamMember["role"])}>
+                  <option>Administrator</option><option>Editor</option><option>Viewer</option>
+                </select>
+              </Field>
+              <button type="button" className="primary member-add-button" onClick={addMember}><Plus /> Add member</button>
+            </div>
+            <div className="settings-list">
+              {membersForm.map((member) => (
+                <div key={member.id}>
+                  <span className="avatar">{member.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</span>
+                  <p><strong>{member.name}</strong><small>{member.email}</small></p>
+                  <div className="member-actions">
+                    <select
+                      aria-label={`Role for ${member.name}`}
+                      value={member.role}
+                      disabled={member.role === "Owner"}
+                      onChange={(event) => saveMembers(membersForm.map((entry) => entry.id === member.id ? { ...entry, role: event.target.value as TeamMember["role"] } : entry))}
+                    >
+                      {member.role === "Owner" && <option>Owner</option>}
+                      <option>Administrator</option><option>Editor</option><option>Viewer</option>
+                    </select>
+                    {member.role !== "Owner" && (
+                      <button type="button" className="icon-btn danger" aria-label={`Remove ${member.name}`} onClick={() => saveMembers(membersForm.filter((entry) => entry.id !== member.id))}><Trash2 /></button>
+                    )}
+                  </div>
+                </div>
+              ))}
+              <p className="settings-note">This directory and its roles are stored in Supabase. Website access remains protected by the workspace sign-in.</p>
+            </div>
+          </>
         )}
         {section === "Audit log" && (
           <div className="audit-list">
-            <div><Check /><p><strong>Supabase connection verified</strong><small>Today · System</small></p></div>
-            <div><FileText /><p><strong>Invoice records synchronized</strong><small>Today · Youssef Mohamed</small></p></div>
-            <div><Activity /><p><strong>Workspace settings loaded</strong><small>Today · System</small></p></div>
+            {activity.length ? activity.map((entry) => (
+              <div key={entry.id}>
+                <Activity />
+                <p>
+                  <strong>{entry.action}</strong>
+                  <small>{new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(entry.createdAt))} · {entry.actor}</small>
+                </p>
+                <b>{entry.area}</b>
+              </div>
+            )) : (
+              <p className="settings-note">No recorded activity yet. New saves, imports and invoice updates will appear here.</p>
+            )}
           </div>
         )}
         <div className="toggle-row">
           <div>
             <strong>Dark interface</strong>
-            <small>Switch the business workspace to dark mode.</small>
+            <small>Switch the business workspace to dark mode on this device.</small>
           </div>
           <button
             className={dark ? "toggle on" : "toggle"}
