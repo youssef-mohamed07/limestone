@@ -1,5 +1,11 @@
 "use client";
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 import Image from "next/image";
 import {
   Activity,
@@ -105,6 +111,27 @@ type Product = {
   price: number;
   hs: string;
   available: boolean;
+};
+type CompanySettings = {
+  companyName: string;
+  tagline: string;
+  email: string;
+  phone: string;
+  taxCard: string;
+  commercialRegistration: string;
+  address: string;
+  currency: string;
+  portLoading: string;
+  downPaymentPercent: number;
+  marbleBackground: boolean;
+};
+type CatalogData = {
+  customers: Customer[];
+  products: Product[];
+  payments: string[][];
+  shipments: string[][];
+  documents: string[][];
+  settings: CompanySettings;
 };
 const customers: Customer[] = [
   {
@@ -337,6 +364,44 @@ const seedInvoices: Invoice[] = [
     notes: "",
   },
 ];
+const seedPayments = [
+  ["CIB-0827-1042", "Premier Paving & Tiles", "PI-26-27", "27 Aug 2026", "Bank transfer", "$10,098.68"],
+  ["CIB-0820-1618", "Stone World London", "PI-26-26", "20 Aug 2026", "Bank transfer", "$19,887.00"],
+  ["CIB-0818-0904", "Stone World London", "PI-26-26", "18 Aug 2026", "Bank transfer", "$8,523.00"],
+];
+const seedShipments = [
+  ["SHP-26-018", "Premier Paving & Tiles", "Alexandria to London Gateway", "MAERSK NORFOLK", "12 Sep / 26 Sep", "In Transit"],
+  ["SHP-26-017", "Nordic Stone AB", "Alexandria to Gothenburg", "MSC ANNA", "09 Sep / 23 Sep", "Booked"],
+  ["SHP-26-016", "Stone World London", "Damietta to Felixstowe", "CMA CGM TITUS", "28 Aug / 12 Sep", "Arrived"],
+];
+const seedDocuments = [
+  ["PI-26-27.pdf", "Proforma Invoice", "PI-26-27", "23 Aug 2026", "Youssef M.", "Final"],
+  ["PL-26-26.pdf", "Packing List", "SHP-26-016", "26 Aug 2026", "Omar H.", "Final"],
+  ["BL-MAE884290.pdf", "Bill of Lading", "SHP-26-018", "02 Sep 2026", "Omar H.", "Verified"],
+  ["COO-26-016.pdf", "Certificate of Origin", "PI-26-26", "27 Aug 2026", "Youssef M.", "Final"],
+];
+const seedSettings: CompanySettings = {
+  companyName: "Limestone for Marble and Granite",
+  tagline: "Egyptian Natural Stone Exporter",
+  email: "mohamed@loldlimestone.net",
+  phone: "+20 111 121 0056",
+  taxCard: "773-932-488",
+  commercialRegistration: "6724 / 9",
+  address: "56 Ragheb Street, Helwan, 4th Floor, Cairo, Egypt",
+  currency: "USD",
+  portLoading: "Any Egyptian Port",
+  downPaymentPercent: 25,
+  marbleBackground: true,
+};
+const seedCatalog: CatalogData = {
+  customers,
+  products,
+  payments: seedPayments,
+  shipments: seedShipments,
+  documents: seedDocuments,
+  settings: seedSettings,
+};
+const CatalogContext = createContext<CatalogData>(seedCatalog);
 const nav = [
   ["Dashboard", LayoutDashboard],
   ["Invoices", FileText],
@@ -400,6 +465,7 @@ export default function LimestoneERP() {
   const [toast, setToast] = useState("");
   const [mobileNav, setMobileNav] = useState(false);
   const [dark, setDark] = useState(false);
+  const [catalog, setCatalog] = useState<CatalogData>(seedCatalog);
   const notify = (message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(""), 2600);
@@ -421,6 +487,40 @@ export default function LimestoneERP() {
             ...current.filter((invoice) => !storedIds.has(invoice.id)),
           ];
         });
+      })
+      .catch(() => undefined);
+    return () => {
+      activeRequest = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let activeRequest = true;
+    void fetch("/api/data")
+      .then(async (response) => {
+        if (!response.ok) return null;
+        return (await response.json()) as { data?: Partial<CatalogData> };
+      })
+      .then((result) => {
+        if (!activeRequest || !result?.data) return;
+        setCatalog((current) => ({
+          customers: Array.isArray(result.data?.customers)
+            ? result.data.customers
+            : current.customers,
+          products: Array.isArray(result.data?.products)
+            ? result.data.products
+            : current.products,
+          payments: Array.isArray(result.data?.payments)
+            ? result.data.payments
+            : current.payments,
+          shipments: Array.isArray(result.data?.shipments)
+            ? result.data.shipments
+            : current.shipments,
+          documents: Array.isArray(result.data?.documents)
+            ? result.data.documents
+            : current.documents,
+          settings: result.data?.settings ?? current.settings,
+        }));
       })
       .catch(() => undefined);
     return () => {
@@ -471,6 +571,7 @@ export default function LimestoneERP() {
       .includes(query.toLowerCase()),
   );
   return (
+    <CatalogContext.Provider value={catalog}>
     <main className={dark ? "app-shell dark" : "app-shell"}>
       <aside className={`sidebar ${mobileNav ? "open" : ""}`}>
         <div className="sidebar-brand">
@@ -609,6 +710,7 @@ export default function LimestoneERP() {
         </div>
       )}
     </main>
+    </CatalogContext.Provider>
   );
 }
 function PageHeader({ active, onNew }: { active: string; onNew: () => void }) {
@@ -906,6 +1008,7 @@ function InvoiceBuilder({
   onClose: () => void;
   onSave: (i: Invoice) => void;
 }) {
+  const { customers, products, settings } = useContext(CatalogContext);
   const next =
     Math.max(...invoices.map((i) => Number(i.number.split("-")[1]))) + 1;
   const [form, setForm] = useState<Invoice>(initial ?? {
@@ -914,7 +1017,7 @@ function InvoiceBuilder({
     date: new Date().toISOString().slice(0, 10),
     customer: customers[0].company,
     customerId: customers[0].id,
-    currency: "USD",
+    currency: settings.currency as Invoice["currency"],
     status: "Draft",
     items: [
       { id: crypto.randomUUID(), description: "Sinai Pearl", finish: "Acid + Tumbled", size: "900 × 600 × 20 mm", quantity: 529, unit: "m²", unitPriceMinor: 2300, hsCode: "68-02-21", crates: 23, marks: "N\\M" },
@@ -926,17 +1029,17 @@ function InvoiceBuilder({
     containers: 4,
     containerType: "20′ GP",
     freightPerContainerMinor: 76000,
-    downPaymentPercent: 25,
+    downPaymentPercent: settings.downPaymentPercent,
     paidMinor: 0,
-    portLoading: "Any Egyptian Port",
+    portLoading: settings.portLoading,
     portDischarge: customers[0].port,
     notes: "Goods remain property of seller until full payment.",
     commercialRegistration: "6724 / 9",
     taxCard: "773-932-488",
-    sellerName: "Limestone for Marble and Granite",
-    sellerAddress: "56 Ragheb Street, Helwan, 4th Floor, Cairo, Egypt",
-    sellerPhone: "+20 111 121 0056 - +20 106 610 1017",
-    sellerEmail: "mohamed@loldlimestone.net",
+    sellerName: settings.companyName,
+    sellerAddress: settings.address,
+    sellerPhone: settings.phone,
+    sellerEmail: settings.email,
     shipToAddress: "Premier Paving & Tiles, 29s Purdeys Way, Rochford, Essex, United Kingdom, SS4 1 ND",
     originCountry: "EGYPT",
     hsCode: "68-02-21",
@@ -1541,6 +1644,7 @@ function InvoiceDetail({
   );
 }
 function InvoicePaper({ invoice }: { invoice: Invoice }) {
+  const { customers, settings } = useContext(CatalogContext);
   const t = totalOf(invoice),
     customer = customers.find((c) => c.id === invoice.customerId);
   return (
@@ -1554,18 +1658,18 @@ function InvoicePaper({ invoice }: { invoice: Invoice }) {
         </div>
       </header>
       <section className="registration-grid">
-        <div><span>Commercial R.</span><strong>{invoice.commercialRegistration ?? "6724 / 9"}</strong></div>
+        <div><span>Commercial R.</span><strong>{invoice.commercialRegistration ?? settings.commercialRegistration}</strong></div>
         <div className="registration-brand">LIMESTONE</div>
-        <div><span>Tax card</span><strong>{invoice.taxCard ?? "773-932-488"}</strong></div>
+        <div><span>Tax card</span><strong>{invoice.taxCard ?? settings.taxCard}</strong></div>
         <div className="customer-ribbon">{invoice.customer}</div>
       </section>
       <div className="section-ribbon">SHIP FROM</div>
       <section className="invoice-information-grid">
         <div className="seller-cell">
-          <strong>{invoice.sellerName ?? "Limestone for Marble and Granite"}</strong>
-          <p>{invoice.sellerAddress ?? "56 Ragheb Street, Helwan, 4th Floor, Cairo, Egypt"}</p>
-          <p>{invoice.sellerPhone ?? "+20 111 121 0056 - +20 106 610 1017"}</p>
-          <p>{invoice.sellerEmail ?? "mohamed@loldlimestone.net"}</p>
+          <strong>{invoice.sellerName ?? settings.companyName}</strong>
+          <p>{invoice.sellerAddress ?? settings.address}</p>
+          <p>{invoice.sellerPhone ?? settings.phone}</p>
+          <p>{invoice.sellerEmail ?? settings.email}</p>
         </div>
         <div className="shipping-facts">
           <div><span>INVOICE NO.</span><strong>{invoice.number}</strong></div>
@@ -1641,10 +1745,11 @@ function InvoicePaper({ invoice }: { invoice: Invoice }) {
   );
 }
 function CustomersPage() {
+  const { customers } = useContext(CatalogContext);
   return (
     <EntityPage
       title="Customer directory"
-      count="18 customers"
+      count={`${customers.length} customers`}
       button="Add customer"
       columns={[
         "Company",
@@ -1666,10 +1771,11 @@ function CustomersPage() {
   );
 }
 function ProductsPage() {
+  const { products } = useContext(CatalogContext);
   return (
     <EntityPage
       title="Stone catalogue"
-      count="4 active products"
+      count={`${products.length} active products`}
       button="Add product"
       columns={[
         "Product",
@@ -1691,46 +1797,23 @@ function ProductsPage() {
   );
 }
 function PaymentsPage() {
+  const { payments } = useContext(CatalogContext);
   return (
     <EntityPage
       title="Payment ledger"
-      count="3 transactions"
+      count={`${payments.length} transactions`}
       button="Record payment"
       columns={["Reference", "Customer", "Invoice", "Date", "Method", "Amount"]}
-      rows={[
-        [
-          "CIB-0827-1042",
-          "Premier Paving & Tiles",
-          "PI-26-27",
-          "27 Aug 2026",
-          "Bank transfer",
-          "$10,098.68",
-        ],
-        [
-          "CIB-0820-1618",
-          "Stone World London",
-          "PI-26-26",
-          "20 Aug 2026",
-          "Bank transfer",
-          "$19,887.00",
-        ],
-        [
-          "CIB-0818-0904",
-          "Stone World London",
-          "PI-26-26",
-          "18 Aug 2026",
-          "Bank transfer",
-          "$8,523.00",
-        ],
-      ]}
+      rows={payments}
     />
   );
 }
 function ShipmentsPage() {
+  const { shipments } = useContext(CatalogContext);
   return (
     <EntityPage
       title="Export shipments"
-      count="6 active shipments"
+      count={`${shipments.length} active shipments`}
       button="Create shipment"
       columns={[
         "Shipment",
@@ -1740,77 +1823,20 @@ function ShipmentsPage() {
         "ETD / ETA",
         "Status",
       ]}
-      rows={[
-        [
-          "SHP-26-018",
-          "Premier Paving & Tiles",
-          "Alexandria → London Gateway",
-          "MAERSK NORFOLK",
-          "12 Sep / 26 Sep",
-          "In Transit",
-        ],
-        [
-          "SHP-26-017",
-          "Nordic Stone AB",
-          "Alexandria → Gothenburg",
-          "MSC ANNA",
-          "09 Sep / 23 Sep",
-          "Booked",
-        ],
-        [
-          "SHP-26-016",
-          "Stone World London",
-          "Damietta → Felixstowe",
-          "CMA CGM TITUS",
-          "28 Aug / 12 Sep",
-          "Arrived",
-        ],
-      ]}
+      rows={shipments}
     />
   );
 }
 function DocumentsPage({ notify }: { notify: (s: string) => void }) {
+  const { documents } = useContext(CatalogContext);
   return (
     <EntityPage
       title="Export documents"
-      count="12 files"
+      count={`${documents.length} files`}
       button="Upload document"
       onAction={() => notify("Document upload ready")}
       columns={["Document", "Type", "Linked to", "Updated", "Owner", "Status"]}
-      rows={[
-        [
-          "PI-26-27.pdf",
-          "Proforma Invoice",
-          "PI-26-27",
-          "23 Aug 2026",
-          "Youssef M.",
-          "Final",
-        ],
-        [
-          "PL-26-26.pdf",
-          "Packing List",
-          "SHP-26-016",
-          "26 Aug 2026",
-          "Omar H.",
-          "Final",
-        ],
-        [
-          "BL-MAE884290.pdf",
-          "Bill of Lading",
-          "SHP-26-018",
-          "02 Sep 2026",
-          "Omar H.",
-          "Verified",
-        ],
-        [
-          "COO-26-016.pdf",
-          "Certificate of Origin",
-          "PI-26-26",
-          "27 Aug 2026",
-          "Youssef M.",
-          "Final",
-        ],
-      ]}
+      rows={documents}
     />
   );
 }
@@ -1973,6 +1999,33 @@ function SettingsPage({
   setDark: (v: boolean) => void;
   notify: (s: string) => void;
 }) {
+  const { settings } = useContext(CatalogContext);
+  const [form, setForm] = useState(settings);
+  const update = <K extends keyof CompanySettings>(
+    key: K,
+    value: CompanySettings[K],
+  ) => setForm((current) => ({ ...current, [key]: value }));
+  const saveSettings = () => {
+    notify("Saving company settings…");
+    void fetch("/api/data", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings: form }),
+    })
+      .then(async (response) => {
+        if (response.ok) return;
+        const result = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(result?.error ?? "Unable to save settings");
+      })
+      .then(() => notify("Company settings saved to Supabase"))
+      .catch((error: unknown) =>
+        notify(
+          error instanceof Error ? error.message : "Unable to save settings",
+        ),
+      );
+  };
   return (
     <div className="settings-layout">
       <aside className="settings-nav">
@@ -2007,43 +2060,78 @@ function SettingsPage({
         </div>
         <div className="form-grid cols-2">
           <Field label="Company name">
-            <input defaultValue="Limestone for Marble and Granite" />
+            <input
+              value={form.companyName}
+              onChange={(event) => update("companyName", event.target.value)}
+            />
           </Field>
           <Field label="Tagline">
-            <input defaultValue="Egyptian Natural Stone Exporter" />
+            <input
+              value={form.tagline}
+              onChange={(event) => update("tagline", event.target.value)}
+            />
           </Field>
           <Field label="Email">
-            <input defaultValue="mohamed@loldlimestone.net" />
+            <input
+              value={form.email}
+              onChange={(event) => update("email", event.target.value)}
+            />
           </Field>
           <Field label="Phone">
-            <input defaultValue="+20 111 121 0056" />
+            <input
+              value={form.phone}
+              onChange={(event) => update("phone", event.target.value)}
+            />
           </Field>
           <Field label="Tax card">
-            <input defaultValue="773-932-488" />
+            <input
+              value={form.taxCard}
+              onChange={(event) => update("taxCard", event.target.value)}
+            />
           </Field>
           <Field label="Commercial registration">
-            <input defaultValue="9" />
+            <input
+              value={form.commercialRegistration}
+              onChange={(event) =>
+                update("commercialRegistration", event.target.value)
+              }
+            />
           </Field>
         </div>
         <Field label="Registered address">
           <textarea
             rows={3}
-            defaultValue="56 Ragheb Street, Helwan, 4th Floor, Cairo, Egypt"
+            value={form.address}
+            onChange={(event) => update("address", event.target.value)}
           />
         </Field>
         <h4>Invoice defaults</h4>
         <div className="form-grid cols-3">
           <Field label="Currency">
-            <select>
+            <select
+              value={form.currency}
+              onChange={(event) => update("currency", event.target.value)}
+            >
               <option>USD</option>
               <option>EUR</option>
             </select>
           </Field>
           <Field label="Port of loading">
-            <input defaultValue="Any Egyptian Port" />
+            <input
+              value={form.portLoading}
+              onChange={(event) => update("portLoading", event.target.value)}
+            />
           </Field>
           <Field label="Down payment">
-            <input defaultValue="25%" />
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={form.downPaymentPercent}
+              onChange={(event) =>
+                update("downPaymentPercent", Number(event.target.value))
+              }
+            />
           </Field>
         </div>
         <div className="toggle-row">
@@ -2051,7 +2139,11 @@ function SettingsPage({
             <strong>Marble invoice background</strong>
             <small>Add a subtle premium texture to printable documents.</small>
           </div>
-          <button className="toggle on">
+          <button
+            type="button"
+            className={form.marbleBackground ? "toggle on" : "toggle"}
+            onClick={() => update("marbleBackground", !form.marbleBackground)}
+          >
             <i />
           </button>
         </div>
@@ -2070,7 +2162,7 @@ function SettingsPage({
         <div className="settings-save">
           <button
             className="primary"
-            onClick={() => notify("Company settings saved")}
+            onClick={saveSettings}
           >
             <Check />
             Save changes

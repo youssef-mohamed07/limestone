@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { getChatGPTUser } from "../../chatgpt-auth";
-import { getDb } from "../../../db";
-import { activityLogs, invoiceSnapshots } from "../../../db/schema";
 import { calculateInvoiceTotals } from "../../../lib/calculations";
+import {
+  listSupabaseRecords,
+  upsertSupabaseRecord,
+} from "../../../lib/supabase-records";
 import { invoiceSchema } from "../../../lib/validation";
 
 export async function GET() {
@@ -14,18 +16,19 @@ export async function GET() {
     );
 
   try {
-    const rows = await getDb().select().from(invoiceSnapshots);
-    const invoiceData = rows.flatMap((row) => {
-      try {
-        return [JSON.parse(row.payload)];
-      } catch {
-        return [];
-      }
-    });
-    return NextResponse.json({ invoices: invoiceData });
-  } catch {
+    const rows = await listSupabaseRecords();
+    const invoiceData = rows
+      .filter((row) => row.entity_type === "invoice")
+      .map((row) => row.payload);
+    return NextResponse.json({ invoices: invoiceData, source: "supabase" });
+  } catch (error) {
     return NextResponse.json(
-      { error: "Invoice storage is not available yet" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Invoice storage is not available yet",
+      },
       { status: 503 },
     );
   }
@@ -66,40 +69,13 @@ export async function POST(request: Request) {
     const now = new Date().toISOString();
     const invoiceId = typeof body.id === "string" ? body.id : crypto.randomUUID();
     const snapshot = { ...body, id: invoiceId };
-    const db = getDb();
-
-    await db
-      .insert(invoiceSnapshots)
-      .values({
-        id: invoiceId,
-        number: parsed.data.number,
-        payload: JSON.stringify(snapshot),
-        createdAt: now,
-        updatedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: invoiceSnapshots.id,
-        set: {
-          number: parsed.data.number,
-          payload: JSON.stringify(snapshot),
-          updatedAt: now,
-        },
-      });
-
-    await db.insert(activityLogs).values({
-      id: crypto.randomUUID(),
-      userId: user.userId,
-      action: "INVOICE_SAVED",
-      entity: "Invoice",
-      entityId: invoiceId,
-      newValue: JSON.stringify({
-        number: parsed.data.number,
-        grandTotalMinor: totals.grandTotalMinor,
-      }),
-      createdAt: now,
+    await upsertSupabaseRecord(`invoice:${invoiceId}`, "invoice", {
+      ...snapshot,
+      updatedAt: now,
+      updatedBy: user.email,
     });
 
-    return NextResponse.json({ id: invoiceId, totals });
+    return NextResponse.json({ id: invoiceId, totals, source: "supabase" });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unable to save invoice" },
