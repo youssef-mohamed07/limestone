@@ -49,6 +49,7 @@ import {
   type ParsedProforma,
   type SpreadsheetCell,
 } from "../lib/proforma-import";
+import ArabicHoverTranslator from "./arabic-hover-translator";
 type Item = {
   id: string;
   description: string;
@@ -745,6 +746,7 @@ export default function LimestoneERP() {
   return (
     <CatalogContext.Provider value={catalog}>
     <main className={dark ? "app-shell dark" : "app-shell"}>
+      <ArabicHoverTranslator />
       <aside className={`sidebar ${mobileNav ? "open" : ""}`}>
         <div className="sidebar-brand">
           <Logo light />
