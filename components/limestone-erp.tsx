@@ -370,6 +370,14 @@ const labelDate = (iso: string) =>
     month: "short",
     year: "numeric",
   }).format(new Date(`${iso}T12:00:00`));
+const printInvoice = (previewOnly = false) => {
+  if (previewOnly) document.body.classList.add("print-preview-only");
+  try {
+    window.print();
+  } finally {
+    document.body.classList.remove("print-preview-only");
+  }
+};
 function Logo({ light = false }: { light?: boolean }) {
   return (
     <div className={`logo-lockup ${light ? "light" : ""}`}>
@@ -1398,7 +1406,7 @@ function InvoiceBuilder({
         <div className="invoice-preview-overlay">
           <div className="preview-toolbar">
             <button className="secondary" onClick={() => setPreview(false)}><X /> Close preview</button>
-            <button className="primary" onClick={() => window.print()}><Printer /> Print / Save PDF</button>
+            <button className="primary" onClick={() => printInvoice(true)}><Printer /> Print / Save PDF</button>
           </div>
           <InvoicePaper invoice={form} />
         </div>
@@ -1466,7 +1474,7 @@ function InvoiceDetail({
           <button className="secondary" onClick={onDuplicate}>
             <Copy /> Duplicate
           </button>
-          <button className="secondary" onClick={() => window.print()}>
+          <button className="secondary" onClick={() => printInvoice()}>
             <Printer /> Print / PDF
           </button>
           <button className="primary" onClick={onPayment}>

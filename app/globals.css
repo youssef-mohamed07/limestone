@@ -945,6 +945,10 @@ body {
     overflow: visible !important;
     background: #fff !important;
   }
+  body.print-preview-only .detail-page,
+  body:has(.invoice-preview-overlay) .detail-page {
+    display: none !important;
+  }
   .reference-invoice,
   .invoice-preview-overlay .reference-invoice,
   .detail-layout .reference-invoice {
@@ -960,6 +964,9 @@ body {
     box-shadow: none !important;
     overflow: hidden !important;
     background: #fff !important;
+    break-inside: avoid-page !important;
+    page-break-inside: avoid !important;
+    page-break-after: avoid !important;
   }
   .reference-invoice::after {
     inset: 2mm;
@@ -969,22 +976,22 @@ body {
     opacity: 0.028 !important;
   }
   .reference-header {
-    height: 28mm !important;
-    padding: 1.5mm 4mm 1.5mm 2mm !important;
+    height: 25mm !important;
+    padding: 1.5mm 4mm 1.5mm 2.5mm !important;
   }
   .reference-invoice .reference-header .logo-lockup img {
-    width: 26mm !important;
-    height: 26mm !important;
+    width: 22mm !important;
+    height: 22mm !important;
   }
   .document-title span {
     font-size: 7.5pt !important;
   }
   .document-title strong {
-    font-size: 23pt !important;
+    font-size: 21pt !important;
   }
   .registration-grid > div {
-    min-height: 8.5mm !important;
-    padding: 1.5mm 3mm !important;
+    min-height: 7.5mm !important;
+    padding: 1.2mm 3mm !important;
     font-size: 7.5pt !important;
   }
   .registration-brand {
@@ -997,8 +1004,8 @@ body {
   }
   .section-ribbon,
   .payment-ribbon {
-    min-height: 6mm !important;
-    padding: 1.4mm 2mm !important;
+    min-height: 5.5mm !important;
+    padding: 1.15mm 2mm !important;
     background: #f1ede3 !important;
     color: #191917 !important;
     font-size: 7.5pt !important;
@@ -1013,13 +1020,13 @@ body {
   }
   .seller-cell,
   .ship-to-cell {
-    padding: 2.5mm 4mm !important;
+    padding: 2mm 4mm !important;
   }
   .seller-cell {
-    min-height: 29mm !important;
+    min-height: 26mm !important;
   }
   .ship-to-cell {
-    min-height: 36mm !important;
+    min-height: 42mm !important;
   }
   .seller-cell strong,
   .ship-to-cell > strong {
@@ -1032,11 +1039,11 @@ body {
   }
   .shipping-facts > div,
   .shipping-facts.lower > div:nth-child(3) {
-    min-height: 9.6mm !important;
+    min-height: 7mm !important;
   }
   .shipping-facts > div:nth-child(3),
   .shipping-facts.lower > div:nth-child(1) {
-    min-height: 29mm !important;
+    min-height: 12mm !important;
   }
   .shipping-facts span,
   .shipping-facts strong,
@@ -1044,7 +1051,7 @@ body {
     font-size: 6.7pt !important;
   }
   .shipping-facts .container-fact {
-    min-height: 9mm !important;
+    min-height: 8mm !important;
     background: #f1ede3 !important;
     color: #191917 !important;
   }
@@ -1071,9 +1078,9 @@ body {
   .reference-invoice .invoice-items td {
     display: table-cell !important;
     visibility: visible !important;
-    padding: 1.8mm 2mm !important;
-    font-size: 7.3pt !important;
-    line-height: 1.25 !important;
+    padding: 1.55mm 2mm !important;
+    font-size: 7.4pt !important;
+    line-height: 1.22 !important;
     border-color: #3a3832 !important;
   }
   .reference-invoice .invoice-items th {
@@ -1087,7 +1094,7 @@ body {
     background: #f3f0e8 !important;
   }
   .reference-totals > div {
-    min-height: 7.5mm !important;
+    min-height: 6.8mm !important;
     font-size: 7.3pt !important;
   }
   .reference-totals .grand {
@@ -1097,17 +1104,21 @@ body {
     font-size: 9pt !important;
   }
   .reference-bank {
-    margin-top: 2.5mm !important;
+    margin-top: 2mm !important;
     border-color: #3a3832 !important;
   }
   .reference-bank > div {
-    min-height: 4.8mm !important;
-    padding: 0.9mm 2mm !important;
+    min-height: 4.25mm !important;
+    padding: 0.7mm 2mm !important;
     font-size: 6.4pt !important;
     line-height: 1.2 !important;
   }
   .reference-footer {
-    margin: 2.5mm 3mm 0 !important;
+    position: absolute !important;
+    left: 3mm !important;
+    right: 3mm !important;
+    bottom: 2.5mm !important;
+    margin: 0 !important;
     font-size: 6pt !important;
   }
   .reference-footer b {
