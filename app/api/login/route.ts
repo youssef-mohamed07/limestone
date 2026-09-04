@@ -6,15 +6,22 @@ import {
 
 export async function POST(request: Request) {
   const form = await request.formData();
-  const password = String(form.get('password') ?? '');
+  const password = String(form.get('password') ?? '').trim();
   const returnToValue = String(form.get('return_to') ?? '/');
   const returnTo =
     returnToValue.startsWith('/') && !returnToValue.startsWith('//')
       ? returnToValue
       : '/';
-  const expected = process.env.APP_PASSWORD;
+  const expected = process.env.APP_PASSWORD?.trim();
 
-  if (!expected || !constantTimeEqual(password, expected)) {
+  if (!expected) {
+    return NextResponse.redirect(
+      new URL(`/login?config=1&return_to=${encodeURIComponent(returnTo)}`, request.url),
+      303,
+    );
+  }
+
+  if (!constantTimeEqual(password, expected)) {
     return NextResponse.redirect(
       new URL(`/login?error=1&return_to=${encodeURIComponent(returnTo)}`, request.url),
       303,

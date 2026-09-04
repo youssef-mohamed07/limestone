@@ -66,7 +66,7 @@ export async function requireChatGPTUser(
 }
 
 export async function getPasswordSessionToken(): Promise<string | null> {
-  const password = process.env.APP_PASSWORD;
+  const password = process.env.APP_PASSWORD?.trim();
   if (!password) return null;
   const bytes = new TextEncoder().encode(`limestone:${password}`);
   const digest = await crypto.subtle.digest('SHA-256', bytes);

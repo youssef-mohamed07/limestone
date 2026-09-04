@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; return_to?: string }>;
+  searchParams: Promise<{ config?: string; error?: string; return_to?: string }>;
 }) {
   const params = await searchParams;
   return (
@@ -32,7 +32,17 @@ export default async function LoginPage({
               autoFocus
             />
           </label>
-          {params.error && <strong className="login-error">Incorrect password. Please try again.</strong>}
+          {params.config && (
+            <strong className="login-error">
+              APP_PASSWORD is missing from this Vercel deployment. Add it to
+              Production and redeploy.
+            </strong>
+          )}
+          {params.error && (
+            <strong className="login-error">
+              Incorrect password. Please enter the exact APP_PASSWORD value.
+            </strong>
+          )}
           <button type="submit">Sign in securely</button>
         </form>
       </section>
