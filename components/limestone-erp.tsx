@@ -81,6 +81,7 @@ type Invoice = {
   grossWeightKg?: number;
   netWeightKg?: number;
   totalCrates?: number;
+  incoterm?: string;
   paymentTerms?: string;
   bankAccountNumber?: string;
   bankIban?: string;
@@ -124,6 +125,11 @@ type CompanySettings = {
   portLoading: string;
   downPaymentPercent: number;
   marbleBackground: boolean;
+  bankName: string;
+  bankBranch: string;
+  bankAccountNumber: string;
+  bankIban: string;
+  bankSwift: string;
 };
 type CatalogData = {
   customers: Customer[];
@@ -295,6 +301,7 @@ const seedInvoices: Invoice[] = [
     grossWeightKg: 27000,
     netWeightKg: 26000,
     totalCrates: 114,
+    incoterm: "CFR",
     paymentTerms: "25% DOWN PAYMENT AND THE REST UPON RECEIPT OF DOCUMENTS",
     bankAccountNumber: "100073581782",
     bankIban: "EG070010019200000100073581782",
@@ -392,6 +399,11 @@ const seedSettings: CompanySettings = {
   portLoading: "Any Egyptian Port",
   downPaymentPercent: 25,
   marbleBackground: true,
+  bankName: "BANQUE CIB",
+  bankBranch: "Helwan",
+  bankAccountNumber: "100073581782",
+  bankIban: "EG070010019200000100073581782",
+  bankSwift: "CIBEEGCX192",
 };
 const seedCatalog: CatalogData = {
   customers,
@@ -443,6 +455,23 @@ const printInvoice = (previewOnly = false) => {
     document.body.classList.remove("print-preview-only");
   }
 };
+const downloadCsv = (filename: string, rows: (string | number)[][]) => {
+  const csv = rows
+    .map((row) =>
+      row
+        .map((value) => `"${String(value).replaceAll('"', '""')}"`)
+        .join(","),
+    )
+    .join("\n");
+  const url = URL.createObjectURL(
+    new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" }),
+  );
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+};
 function Logo({ light = false }: { light?: boolean }) {
   return (
     <div className={`logo-lockup ${light ? "light" : ""}`}>
@@ -466,6 +495,7 @@ export default function LimestoneERP() {
   const [mobileNav, setMobileNav] = useState(false);
   const [dark, setDark] = useState(false);
   const [catalog, setCatalog] = useState<CatalogData>(seedCatalog);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const notify = (message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(""), 2600);
@@ -519,7 +549,9 @@ export default function LimestoneERP() {
           documents: Array.isArray(result.data?.documents)
             ? result.data.documents
             : current.documents,
-          settings: result.data?.settings ?? current.settings,
+          settings: result.data?.settings
+            ? { ...current.settings, ...result.data.settings }
+            : current.settings,
         }));
       })
       .catch(() => undefined);
@@ -528,11 +560,31 @@ export default function LimestoneERP() {
     };
   }, []);
 
-  const saveInvoice = (invoice: Invoice) => {
-    setInvoices((old) => [invoice, ...old.filter((i) => i.id !== invoice.id)]);
-    setBuilder(false);
-    setDetail(invoice);
-    notify(`Saving proforma ${invoice.number}…`);
+  const persistCatalog = <K extends keyof CatalogData>(
+    key: K,
+    value: CatalogData[K],
+    successMessage: string,
+  ) => {
+    setCatalog((current) => ({ ...current, [key]: value }));
+    void fetch("/api/data", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [key]: value }),
+    })
+      .then(async (response) => {
+        if (response.ok) return;
+        const result = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(result?.error ?? "Unable to save data");
+      })
+      .then(() => notify(successMessage))
+      .catch((error: unknown) =>
+        notify(error instanceof Error ? error.message : "Unable to save data"),
+      );
+  };
+
+  const persistInvoice = (invoice: Invoice, successMessage: string) => {
     void fetch("/api/invoices", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -545,10 +597,18 @@ export default function LimestoneERP() {
         } | null;
         throw new Error(result?.error ?? "Unable to save invoice");
       })
-      .then(() => notify(`Proforma ${invoice.number} saved securely`))
+      .then(() => notify(successMessage))
       .catch((error: unknown) =>
         notify(error instanceof Error ? error.message : "Unable to save invoice"),
       );
+  };
+
+  const saveInvoice = (invoice: Invoice) => {
+    setInvoices((old) => [invoice, ...old.filter((i) => i.id !== invoice.id)]);
+    setBuilder(false);
+    setDetail(invoice);
+    notify(`Saving proforma ${invoice.number}…`);
+    persistInvoice(invoice, `Proforma ${invoice.number} saved securely`);
   };
   const duplicate = (invoice: Invoice) => {
     const next =
@@ -563,7 +623,59 @@ export default function LimestoneERP() {
       items: invoice.items.map((i) => ({ ...i, id: crypto.randomUUID() })),
     };
     setInvoices((x) => [copy, ...x]);
-    notify(`Created draft ${copy.number}`);
+    persistInvoice(copy, `Created and saved draft ${copy.number}`);
+  };
+  const archiveInvoice = (invoice: Invoice) => {
+    const archived = { ...invoice, status: "Archived" };
+    setInvoices((current) => current.filter((item) => item.id !== invoice.id));
+    if (detail?.id === invoice.id) setDetail(null);
+    persistInvoice(archived, `Proforma ${invoice.number} archived`);
+  };
+  const exportCurrentPage = () => {
+    if (active === "Invoices" || active === "Dashboard" || active === "Reports") {
+      downloadCsv("limestone-invoices.csv", [
+        ["Invoice", "Customer", "Date", "Currency", "Amount", "Paid", "Status"],
+        ...filtered.map((invoice) => [
+          `PI-${invoice.number}`,
+          invoice.customer,
+          invoice.date,
+          invoice.currency,
+          totalOf(invoice).grandTotalMinor / 100,
+          invoice.paidMinor / 100,
+          invoice.status,
+        ]),
+      ]);
+      notify("Invoice export downloaded");
+      return;
+    }
+    const pageRows: Partial<Record<string, string[][]>> = {
+      Customers: catalog.customers.map((customer) => [
+        customer.company,
+        customer.contact,
+        customer.country,
+        customer.vat,
+        customer.port,
+        customer.status,
+      ]),
+      Products: catalog.products.map((product) => [
+        product.name,
+        product.type,
+        product.finish,
+        product.size,
+        `${product.price}`,
+        product.available ? "In stock" : "Unavailable",
+      ]),
+      Payments: catalog.payments,
+      Shipments: catalog.shipments,
+      Documents: catalog.documents,
+    };
+    const rows = pageRows[active];
+    if (rows) {
+      downloadCsv(`limestone-${active.toLowerCase()}.csv`, rows);
+      notify(`${active} export downloaded`);
+    } else {
+      notify("This page is already saved automatically");
+    }
   };
   const filtered = invoices.filter((i) =>
     `${i.number} ${i.customer} ${i.status}`
@@ -604,6 +716,7 @@ export default function LimestoneERP() {
             onClick={() => {
               setActive("Settings");
               setDetail(null);
+              setMobileNav(false);
             }}
           >
             <Settings />
@@ -634,11 +747,44 @@ export default function LimestoneERP() {
             <kbd>⌘ K</kbd>
           </label>
           <div className="top-actions">
-            <button aria-label="Notifications">
+            <button
+              aria-label="Notifications"
+              aria-expanded={notificationsOpen}
+              onClick={() => setNotificationsOpen((open) => !open)}
+            >
               <Bell />
               <i />
             </button>
             <div className="avatar">YM</div>
+            {notificationsOpen && (
+              <div className="notifications-popover">
+                <strong>Notifications</strong>
+                <button
+                  onClick={() => {
+                    setActive("Payments");
+                    setNotificationsOpen(false);
+                  }}
+                >
+                  <Banknote />
+                  <span>
+                    Payment received
+                    <small>$10,098.68 · Today</small>
+                  </span>
+                </button>
+                <button
+                  onClick={() => {
+                    setActive("Shipments");
+                    setNotificationsOpen(false);
+                  }}
+                >
+                  <Ship />
+                  <span>
+                    Shipment update
+                    <small>MSKU-884290 is in transit</small>
+                  </span>
+                </button>
+              </div>
+            )}
           </div>
         </header>
         {detail ? (
@@ -652,23 +798,48 @@ export default function LimestoneERP() {
                 totalOf(detail).grandTotalMinor,
                 detail.paidMinor + totalOf(detail).downPaymentMinor,
               );
+              const updated = { ...detail, paidMinor: paid };
               setInvoices((xs) =>
                 xs.map((x) =>
-                  x.id === detail.id ? { ...x, paidMinor: paid } : x,
+                  x.id === detail.id ? updated : x,
                 ),
               );
-              setDetail({ ...detail, paidMinor: paid });
-              notify("Payment recorded successfully");
+              setDetail(updated);
+              persistInvoice(updated, "Payment recorded successfully");
+            }}
+            onCommercial={() => {
+              notify("Commercial invoice ready for printing");
+              printInvoice();
+            }}
+            onPacking={() => {
+              downloadCsv(`packing-list-${detail.number}.csv`, [
+                ["Marks", "Description", "Finish", "Size", "Quantity", "Unit", "Crates"],
+                ...detail.items.map((item) => [
+                  item.marks ?? "N\\M",
+                  item.description,
+                  item.finish,
+                  item.size,
+                  item.quantity,
+                  item.unit,
+                  item.crates,
+                ]),
+              ]);
+              notify("Packing list downloaded");
             }}
           />
         ) : (
           <div className="content">
-            <PageHeader active={active} onNew={() => setBuilder(true)} />
+            <PageHeader
+              active={active}
+              onNew={() => setBuilder(true)}
+              onExport={exportCurrentPage}
+            />
             {active === "Dashboard" && (
               <Dashboard
                 invoices={invoices}
                 onOpen={setDetail}
                 onInvoices={() => setActive("Invoices")}
+                onShipments={() => setActive("Shipments")}
               />
             )}{" "}
             {active === "Invoices" && (
@@ -676,21 +847,82 @@ export default function LimestoneERP() {
                 invoices={filtered}
                 onOpen={setDetail}
                 onDuplicate={duplicate}
-                onDelete={(id) => {
-                  setInvoices((x) => x.filter((i) => i.id !== id));
-                  notify("Invoice moved to archive");
-                }}
+                onDelete={archiveInvoice}
                 onNew={() => setBuilder(true)}
               />
             )}{" "}
-            {active === "Customers" && <CustomersPage />}
-            {active === "Products" && <ProductsPage />}
-            {active === "Payments" && <PaymentsPage />}
-            {active === "Shipments" && <ShipmentsPage />}
-            {active === "Documents" && <DocumentsPage notify={notify} />}{" "}
-            {active === "Reports" && <ReportsPage invoices={invoices} />}{" "}
+            {active === "Customers" && (
+              <CustomersPage
+                onCreate={(customer) =>
+                  persistCatalog(
+                    "customers",
+                    [...catalog.customers, customer],
+                    "Customer saved to Supabase",
+                  )
+                }
+              />
+            )}
+            {active === "Products" && (
+              <ProductsPage
+                onCreate={(product) =>
+                  persistCatalog(
+                    "products",
+                    [...catalog.products, product],
+                    "Product saved to Supabase",
+                  )
+                }
+              />
+            )}
+            {active === "Payments" && (
+              <PaymentsPage
+                onCreate={(payment) =>
+                  persistCatalog(
+                    "payments",
+                    [payment, ...catalog.payments],
+                    "Payment saved to Supabase",
+                  )
+                }
+              />
+            )}
+            {active === "Shipments" && (
+              <ShipmentsPage
+                onCreate={(shipment) =>
+                  persistCatalog(
+                    "shipments",
+                    [shipment, ...catalog.shipments],
+                    "Shipment saved to Supabase",
+                  )
+                }
+              />
+            )}
+            {active === "Documents" && (
+              <DocumentsPage
+                notify={notify}
+                onCreate={(document) =>
+                  persistCatalog(
+                    "documents",
+                    [document, ...catalog.documents],
+                    "Document saved to Supabase",
+                  )
+                }
+              />
+            )}{" "}
+            {active === "Reports" && (
+              <ReportsPage invoices={invoices} onExport={exportCurrentPage} />
+            )}{" "}
             {active === "Settings" && (
-              <SettingsPage dark={dark} setDark={setDark} notify={notify} />
+              <SettingsPage
+                dark={dark}
+                setDark={setDark}
+                notify={notify}
+                onSave={(settings) =>
+                  persistCatalog(
+                    "settings",
+                    settings,
+                    "Company settings saved to Supabase",
+                  )
+                }
+              />
             )}
           </div>
         )}
@@ -753,7 +985,15 @@ export default function LimestoneERP() {
     </CatalogContext.Provider>
   );
 }
-function PageHeader({ active, onNew }: { active: string; onNew: () => void }) {
+function PageHeader({
+  active,
+  onNew,
+  onExport,
+}: {
+  active: string;
+  onNew: () => void;
+  onExport: () => void;
+}) {
   return (
     <div className="page-heading">
       <div>
@@ -766,7 +1006,7 @@ function PageHeader({ active, onNew }: { active: string; onNew: () => void }) {
         </p>
       </div>
       <div className="heading-actions">
-        <button className="secondary">
+        <button className="secondary" onClick={onExport}>
           <Download /> Export
         </button>
         <button className="primary" onClick={onNew}>
@@ -780,10 +1020,12 @@ function Dashboard({
   invoices,
   onOpen,
   onInvoices,
+  onShipments,
 }: {
   invoices: Invoice[];
   onOpen: (i: Invoice) => void;
   onInvoices: () => void;
+  onShipments: () => void;
 }) {
   const sales = invoices.reduce((s, i) => s + totalOf(i).grandTotalMinor, 0),
     paid = invoices.reduce((s, i) => s + i.paidMinor, 0);
@@ -886,7 +1128,7 @@ function Dashboard({
               <strong>4 × 20′ GP</strong>
             </div>
           </div>
-          <button className="track">Track shipment</button>
+          <button className="track" onClick={onShipments}>Track shipment</button>
           <div className="payment-note">
             <span>$</span>
             <div>
@@ -909,7 +1151,7 @@ function InvoiceTable({
   invoices: Invoice[];
   onOpen: (i: Invoice) => void;
   onDuplicate?: (i: Invoice) => void;
-  onDelete?: (id: string) => void;
+  onDelete?: (invoice: Invoice) => void;
 }) {
   return (
     <div className="table-wrap">
@@ -969,7 +1211,7 @@ function InvoiceTable({
                         title="Archive"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onDelete(i.id);
+                          onDelete(i);
                         }}
                       >
                         <Archive />
@@ -1002,34 +1244,81 @@ function InvoicesPage({
   invoices: Invoice[];
   onOpen: (i: Invoice) => void;
   onDuplicate: (i: Invoice) => void;
-  onDelete: (id: string) => void;
+  onDelete: (invoice: Invoice) => void;
   onNew: () => void;
 }) {
+  const [tab, setTab] = useState("All");
+  const [dateRange, setDateRange] = useState("all");
+  const [status, setStatus] = useState("all");
+  const statuses = Array.from(new Set(invoices.map((invoice) => invoice.status)));
+  const shown = invoices.filter((invoice) => {
+    const balance = totalOf(invoice).grandTotalMinor - invoice.paidMinor;
+    const tabMatch =
+      tab === "All" ||
+      (tab === "Drafts" && invoice.status === "Draft") ||
+      (tab === "Outstanding" && balance > 0 && invoice.status !== "Draft") ||
+      (tab === "Paid" && balance <= 0);
+    const days = dateRange === "all" ? 0 : Number(dateRange);
+    const dateMatch =
+      !days ||
+      new Date(invoice.date).getTime() >=
+        new Date("2026-09-04T23:59:59").getTime() - days * 86400000;
+    return tabMatch && dateMatch && (status === "all" || invoice.status === status);
+  });
   return (
     <section className="panel list-page">
       <div className="list-toolbar">
         <div className="tabs">
-          <button className="selected">
+          <button
+            className={tab === "All" ? "selected" : ""}
+            onClick={() => setTab("All")}
+          >
             All <b>{invoices.length}</b>
           </button>
-          <button>Drafts</button>
-          <button>Outstanding</button>
-          <button>Paid</button>
+          {(["Drafts", "Outstanding", "Paid"] as const).map((name) => (
+            <button
+              key={name}
+              className={tab === name ? "selected" : ""}
+              onClick={() => setTab(name)}
+            >
+              {name}
+            </button>
+          ))}
         </div>
         <div>
-          <button className="filter">
-            <CalendarDays /> Date
-          </button>
-          <button className="filter">
-            <ChevronDown /> Status
-          </button>
+          <label className="filter filter-select">
+            <CalendarDays />
+            <select
+              aria-label="Filter invoices by date"
+              value={dateRange}
+              onChange={(event) => setDateRange(event.target.value)}
+            >
+              <option value="all">Any date</option>
+              <option value="30">Last 30 days</option>
+              <option value="90">Last 90 days</option>
+              <option value="365">This year</option>
+            </select>
+          </label>
+          <label className="filter filter-select">
+            <ChevronDown />
+            <select
+              aria-label="Filter invoices by status"
+              value={status}
+              onChange={(event) => setStatus(event.target.value)}
+            >
+              <option value="all">All statuses</option>
+              {statuses.map((name) => (
+                <option key={name}>{name}</option>
+              ))}
+            </select>
+          </label>
           <button className="primary" onClick={onNew}>
             <Plus /> Create invoice
           </button>
         </div>
       </div>
       <InvoiceTable
-        invoices={invoices}
+        invoices={shown}
         onOpen={onOpen}
         onDuplicate={onDuplicate}
         onDelete={onDelete}
@@ -1086,13 +1375,14 @@ function InvoiceBuilder({
     grossWeightKg: 27000,
     netWeightKg: 26000,
     totalCrates: 114,
+    incoterm: "CFR",
     paymentTerms: "25% DOWN PAYMENT AND THE REST UPON RECEIPT OF DOCUMENTS",
-    bankAccountNumber: "100073581782",
-    bankIban: "EG070010019200000100073581782",
+    bankAccountNumber: settings.bankAccountNumber,
+    bankIban: settings.bankIban,
     bankCompanyName: "Limestone for Marble and Granite",
-    bankName: "BANQUE CIB",
-    bankBranch: "Helwan",
-    bankSwift: "CIBEEGCX192",
+    bankName: settings.bankName,
+    bankBranch: settings.bankBranch,
+    bankSwift: settings.bankSwift,
   });
   const [preview, setPreview] = useState(false);
   const totals = totalOf(form);
@@ -1300,7 +1590,10 @@ function InvoiceBuilder({
                 />
               </Field>
               <Field label="Incoterm">
-                <select>
+                <select
+                  value={form.incoterm ?? "CFR"}
+                  onChange={(event) => patch({ incoterm: event.target.value })}
+                >
                   <option>CFR</option>
                   <option>FOB</option>
                   <option>CIF</option>
@@ -1590,12 +1883,16 @@ function InvoiceDetail({
   onEdit,
   onDuplicate,
   onPayment,
+  onCommercial,
+  onPacking,
 }: {
   invoice: Invoice;
   onBack: () => void;
   onEdit: () => void;
   onDuplicate: () => void;
   onPayment: () => void;
+  onCommercial: () => void;
+  onPacking: () => void;
 }) {
   const t = totalOf(invoice);
   return (
@@ -1672,10 +1969,10 @@ function InvoiceDetail({
               </div>
             ))}
           </section>
-          <button className="side-action">
+          <button className="side-action" onClick={onCommercial}>
             <FileText /> Create commercial invoice <span>→</span>
           </button>
-          <button className="side-action">
+          <button className="side-action" onClick={onPacking}>
             <Package /> Generate packing list <span>→</span>
           </button>
         </aside>
@@ -1763,7 +2060,7 @@ function InvoicePaper({ invoice }: { invoice: Invoice }) {
               </td>
             </tr>
           ))}
-          <tr className="fob-row"><td>{invoice.items[0]?.marks ?? "N\\M"}</td><td colSpan={3}>TOTAL AMOUNT FOB ({invoice.currency})</td><td>{currency(t.subtotalMinor, invoice.currency)}</td></tr>
+          <tr className="fob-row"><td>{invoice.items[0]?.marks ?? "N\\M"}</td><td colSpan={3}>TOTAL AMOUNT {invoice.incoterm ?? "FOB"} ({invoice.currency})</td><td>{currency(t.subtotalMinor, invoice.currency)}</td></tr>
         </tbody>
       </table>
       <section className="reference-totals">
@@ -1784,7 +2081,7 @@ function InvoicePaper({ invoice }: { invoice: Invoice }) {
     </article>
   );
 }
-function CustomersPage() {
+function CustomersPage({ onCreate }: { onCreate: (customer: Customer) => void }) {
   const { customers } = useContext(CatalogContext);
   return (
     <EntityPage
@@ -1807,10 +2104,32 @@ function CustomersPage() {
         c.port,
         c.status,
       ])}
+      fields={[
+        { label: "Company", placeholder: "Customer company" },
+        { label: "Contact", placeholder: "Contact person" },
+        { label: "Country", placeholder: "Country" },
+        { label: "VAT / Tax", placeholder: "Tax number" },
+        { label: "Default port", placeholder: "Destination port" },
+        { label: "Status", options: ["Active", "Inactive"] },
+      ]}
+      onCreate={(values) =>
+        onCreate({
+          id: crypto.randomUUID(),
+          company: values[0],
+          contact: values[1],
+          email: "",
+          phone: "",
+          country: values[2],
+          city: "",
+          vat: values[3],
+          port: values[4],
+          status: values[5],
+        })
+      }
     />
   );
 }
-function ProductsPage() {
+function ProductsPage({ onCreate }: { onCreate: (product: Product) => void }) {
   const { products } = useContext(CatalogContext);
   return (
     <EntityPage
@@ -1833,10 +2152,31 @@ function ProductsPage() {
         `$${p.price.toFixed(2)} / ${p.unit}`,
         p.available ? "In stock" : "Unavailable",
       ])}
+      fields={[
+        { label: "Product", placeholder: "Stone name" },
+        { label: "Stone type", options: ["Limestone", "Marble", "Granite"] },
+        { label: "Finish", placeholder: "Honed, polished…" },
+        { label: "Size", placeholder: "600 × 400 × 20 mm" },
+        { label: "Default price", placeholder: "0.00", type: "number" },
+        { label: "Availability", options: ["In stock", "Unavailable"] },
+      ]}
+      onCreate={(values) =>
+        onCreate({
+          id: crypto.randomUUID(),
+          name: values[0],
+          type: values[1],
+          finish: values[2],
+          size: values[3],
+          unit: "m²",
+          price: Number(values[4]),
+          hs: values[1] === "Marble" ? "680291" : "680292",
+          available: values[5] === "In stock",
+        })
+      }
     />
   );
 }
-function PaymentsPage() {
+function PaymentsPage({ onCreate }: { onCreate: (payment: string[]) => void }) {
   const { payments } = useContext(CatalogContext);
   return (
     <EntityPage
@@ -1845,10 +2185,19 @@ function PaymentsPage() {
       button="Record payment"
       columns={["Reference", "Customer", "Invoice", "Date", "Method", "Amount"]}
       rows={payments}
+      fields={[
+        { label: "Reference", placeholder: "CIB-0904-1200" },
+        { label: "Customer", placeholder: "Customer name" },
+        { label: "Invoice", placeholder: "PI-26-27" },
+        { label: "Date", type: "date" },
+        { label: "Method", options: ["Bank transfer", "Cash", "Card"] },
+        { label: "Amount", placeholder: "$0.00" },
+      ]}
+      onCreate={onCreate}
     />
   );
 }
-function ShipmentsPage() {
+function ShipmentsPage({ onCreate }: { onCreate: (shipment: string[]) => void }) {
   const { shipments } = useContext(CatalogContext);
   return (
     <EntityPage
@@ -1864,22 +2213,54 @@ function ShipmentsPage() {
         "Status",
       ]}
       rows={shipments}
+      fields={[
+        { label: "Shipment", placeholder: "SHP-26-019" },
+        { label: "Customer", placeholder: "Customer name" },
+        { label: "Route", placeholder: "Alexandria to London" },
+        { label: "Vessel", placeholder: "Vessel name" },
+        { label: "ETD / ETA", placeholder: "12 Sep / 26 Sep" },
+        { label: "Status", options: ["Booked", "In Transit", "Arrived"] },
+      ]}
+      onCreate={onCreate}
     />
   );
 }
-function DocumentsPage({ notify }: { notify: (s: string) => void }) {
+function DocumentsPage({
+  notify,
+  onCreate,
+}: {
+  notify: (s: string) => void;
+  onCreate: (document: string[]) => void;
+}) {
   const { documents } = useContext(CatalogContext);
   return (
     <EntityPage
       title="Export documents"
       count={`${documents.length} files`}
       button="Upload document"
-      onAction={() => notify("Document upload ready")}
       columns={["Document", "Type", "Linked to", "Updated", "Owner", "Status"]}
       rows={documents}
+      fields={[
+        { label: "Document name", placeholder: "BL-REFERENCE.pdf" },
+        { label: "Type", options: ["Proforma Invoice", "Packing List", "Bill of Lading", "Certificate of Origin"] },
+        { label: "Linked to", placeholder: "PI-26-27" },
+        { label: "Updated", type: "date" },
+        { label: "Owner", placeholder: "Youssef M." },
+        { label: "Status", options: ["Draft", "Verified", "Final"] },
+      ]}
+      onCreate={(values) => {
+        onCreate(values);
+        notify("Document record uploaded and linked");
+      }}
     />
   );
 }
+type EntityField = {
+  label: string;
+  placeholder?: string;
+  type?: "text" | "number" | "date";
+  options?: string[];
+};
 function EntityPage({
   title,
   count,
@@ -1887,6 +2268,8 @@ function EntityPage({
   columns,
   rows,
   onAction,
+  fields,
+  onCreate,
 }: {
   title: string;
   count: string;
@@ -1894,11 +2277,36 @@ function EntityPage({
   columns: string[];
   rows: string[][];
   onAction?: () => void;
+  fields?: EntityField[];
+  onCreate?: (values: string[]) => void;
 }) {
   const [filter, setFilter] = useState("");
-  const shown = rows.filter((r) =>
-    r.join(" ").toLowerCase().includes(filter.toLowerCase()),
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [creating, setCreating] = useState(false);
+  const [selectedRow, setSelectedRow] = useState<string[] | null>(null);
+  const [values, setValues] = useState(() =>
+    fields?.map((field) => field.options?.[0] ?? "") ?? [],
   );
+  const filterName = columns.at(-1) ?? "Status";
+  const statuses = Array.from(new Set(rows.map((row) => row.at(-1) ?? "")));
+  const shown = rows.filter(
+    (row) =>
+      row.join(" ").toLowerCase().includes(filter.toLowerCase()) &&
+      (statusFilter === "all" || row.at(-1) === statusFilter),
+  );
+  const openCreate = () => {
+    if (onCreate && fields) {
+      setValues(fields.map((field) => field.options?.[0] ?? ""));
+      setCreating(true);
+    } else {
+      onAction?.();
+    }
+  };
+  const submitCreate = () => {
+    if (!onCreate || values.some((value) => !value.trim())) return;
+    onCreate(values);
+    setCreating(false);
+  };
   return (
     <section className="panel entity-page">
       <div className="entity-head">
@@ -1906,7 +2314,7 @@ function EntityPage({
           <h3>{title}</h3>
           <p>{count}</p>
         </div>
-        <button className="primary" onClick={onAction}>
+        <button className="primary" onClick={openCreate}>
           <Plus />
           {button}
         </button>
@@ -1920,9 +2328,19 @@ function EntityPage({
             placeholder={`Search ${title.toLowerCase()}…`}
           />
         </label>
-        <button className="filter">
-          <ChevronDown /> Filter
-        </button>
+        <label className="filter filter-select">
+          <ChevronDown />
+          <select
+            aria-label={`Filter ${title.toLowerCase()} by ${filterName.toLowerCase()}`}
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value)}
+          >
+            <option value="all">All {filterName.toLowerCase()}</option>
+            {statuses.map((status) => (
+              <option key={status}>{status}</option>
+            ))}
+          </select>
+        </label>
       </div>
       <div className="table-wrap">
         <table>
@@ -1949,17 +2367,133 @@ function EntityPage({
                   </td>
                 ))}
                 <td data-label="Actions">
-                  <button className="row-menu">•••</button>
+                  <button
+                    className="row-menu"
+                    aria-label={`View ${r[0]}`}
+                    onClick={() => setSelectedRow(r)}
+                  >
+                    •••
+                  </button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+        {shown.length === 0 && (
+          <div className="empty">
+            <Search />
+            <strong>No matching records</strong>
+            <span>Clear the search or choose a different filter.</span>
+          </div>
+        )}
       </div>
+      {creating && fields && (
+        <div className="modal-backdrop" onMouseDown={() => setCreating(false)}>
+          <section
+            className="quick-modal"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button className="close" onClick={() => setCreating(false)}>
+              <X />
+            </button>
+            <p className="eyebrow">NEW RECORD</p>
+            <h2>{button}</h2>
+            <p>Complete the details below. The record will be saved securely.</p>
+            <div className="modal-grid">
+              {fields.map((field, index) => (
+                <Field label={field.label} key={field.label}>
+                  {field.options ? (
+                    <select
+                      value={values[index]}
+                      onChange={(event) =>
+                        setValues((current) =>
+                          current.map((value, itemIndex) =>
+                            itemIndex === index ? event.target.value : value,
+                          ),
+                        )
+                      }
+                    >
+                      {field.options.map((option) => (
+                        <option key={option}>{option}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type={field.type ?? "text"}
+                      value={values[index]}
+                      placeholder={field.placeholder}
+                      onChange={(event) =>
+                        setValues((current) =>
+                          current.map((value, itemIndex) =>
+                            itemIndex === index ? event.target.value : value,
+                          ),
+                        )
+                      }
+                    />
+                  )}
+                </Field>
+              ))}
+            </div>
+            <div className="modal-actions">
+              <button className="secondary" onClick={() => setCreating(false)}>
+                Cancel
+              </button>
+              <button
+                className="primary"
+                disabled={values.some((value) => !value.trim())}
+                onClick={submitCreate}
+              >
+                <Check /> Save record
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+      {selectedRow && (
+        <div className="modal-backdrop" onMouseDown={() => setSelectedRow(null)}>
+          <section
+            className="quick-modal record-modal"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button className="close" onClick={() => setSelectedRow(null)}>
+              <X />
+            </button>
+            <p className="eyebrow">RECORD DETAILS</p>
+            <h2>{selectedRow[0]}</h2>
+            <div className="record-details">
+              {columns.map((column, index) => (
+                <div key={column}>
+                  <span>{column}</span>
+                  <strong>{selectedRow[index]}</strong>
+                </div>
+              ))}
+            </div>
+            <div className="modal-actions">
+              <button
+                className="secondary"
+                onClick={() =>
+                  downloadCsv(`${selectedRow[0]}.csv`, [columns, selectedRow])
+                }
+              >
+                <Download /> Export row
+              </button>
+              <button className="primary" onClick={() => setSelectedRow(null)}>
+                Done
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </section>
   );
 }
-function ReportsPage({ invoices }: { invoices: Invoice[] }) {
+function ReportsPage({
+  invoices,
+  onExport,
+}: {
+  invoices: Invoice[];
+  onExport: () => void;
+}) {
   const values = [42, 58, 47, 73, 62, 86, 100, 72, 91, 78, 95, 88],
     max = Math.max(...values);
   return (
@@ -1970,7 +2504,7 @@ function ReportsPage({ invoices }: { invoices: Invoice[] }) {
             <h3>Sales performance</h3>
             <p>January — December 2026</p>
           </div>
-          <button>Export CSV</button>
+          <button onClick={onExport}>Export CSV</button>
         </div>
         <div className="bar-chart">
           {values.map((v, i) => (
@@ -2034,58 +2568,66 @@ function SettingsPage({
   dark,
   setDark,
   notify,
+  onSave,
 }: {
   dark: boolean;
   setDark: (v: boolean) => void;
   notify: (s: string) => void;
+  onSave: (settings: CompanySettings) => void;
 }) {
   const { settings } = useContext(CatalogContext);
   const [form, setForm] = useState(settings);
+  const [section, setSection] = useState("Company");
   const update = <K extends keyof CompanySettings>(
     key: K,
     value: CompanySettings[K],
   ) => setForm((current) => ({ ...current, [key]: value }));
   const saveSettings = () => {
     notify("Saving company settings…");
-    void fetch("/api/data", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ settings: form }),
-    })
-      .then(async (response) => {
-        if (response.ok) return;
-        const result = (await response.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        throw new Error(result?.error ?? "Unable to save settings");
-      })
-      .then(() => notify("Company settings saved to Supabase"))
-      .catch((error: unknown) =>
-        notify(
-          error instanceof Error ? error.message : "Unable to save settings",
-        ),
-      );
+    onSave(form);
+  };
+  const sectionCopy: Record<string, string> = {
+    Company: "Details used throughout the app and on export documents.",
+    "Bank accounts": "Banking information printed on invoices and payment documents.",
+    "Invoice preferences": "Defaults applied whenever a new proforma is created.",
+    "Users & roles": "People who can access this private management workspace.",
+    "Audit log": "Recent security and data activity in your workspace.",
   };
   return (
     <div className="settings-layout">
       <aside className="settings-nav">
-        <button className="selected">
+        <button
+          className={section === "Company" ? "selected" : ""}
+          onClick={() => setSection("Company")}
+        >
           <Building2 />
           Company
         </button>
-        <button>
+        <button
+          className={section === "Bank accounts" ? "selected" : ""}
+          onClick={() => setSection("Bank accounts")}
+        >
           <Banknote />
           Bank accounts
         </button>
-        <button>
+        <button
+          className={section === "Invoice preferences" ? "selected" : ""}
+          onClick={() => setSection("Invoice preferences")}
+        >
           <FileText />
           Invoice preferences
         </button>
-        <button>
+        <button
+          className={section === "Users & roles" ? "selected" : ""}
+          onClick={() => setSection("Users & roles")}
+        >
           <Users />
           Users & roles
         </button>
-        <button>
+        <button
+          className={section === "Audit log" ? "selected" : ""}
+          onClick={() => setSection("Audit log")}
+        >
           <Activity />
           Audit log
         </button>
@@ -2093,100 +2635,59 @@ function SettingsPage({
       <section className="panel settings-form">
         <div className="settings-head">
           <div>
-            <h3>Company settings</h3>
-            <p>Details used throughout the app and on export documents.</p>
+            <h3>{section}</h3>
+            <p>{sectionCopy[section]}</p>
           </div>
           <Logo />
         </div>
-        <div className="form-grid cols-2">
-          <Field label="Company name">
-            <input
-              value={form.companyName}
-              onChange={(event) => update("companyName", event.target.value)}
-            />
-          </Field>
-          <Field label="Tagline">
-            <input
-              value={form.tagline}
-              onChange={(event) => update("tagline", event.target.value)}
-            />
-          </Field>
-          <Field label="Email">
-            <input
-              value={form.email}
-              onChange={(event) => update("email", event.target.value)}
-            />
-          </Field>
-          <Field label="Phone">
-            <input
-              value={form.phone}
-              onChange={(event) => update("phone", event.target.value)}
-            />
-          </Field>
-          <Field label="Tax card">
-            <input
-              value={form.taxCard}
-              onChange={(event) => update("taxCard", event.target.value)}
-            />
-          </Field>
-          <Field label="Commercial registration">
-            <input
-              value={form.commercialRegistration}
-              onChange={(event) =>
-                update("commercialRegistration", event.target.value)
-              }
-            />
-          </Field>
-        </div>
-        <Field label="Registered address">
-          <textarea
-            rows={3}
-            value={form.address}
-            onChange={(event) => update("address", event.target.value)}
-          />
-        </Field>
-        <h4>Invoice defaults</h4>
-        <div className="form-grid cols-3">
-          <Field label="Currency">
-            <select
-              value={form.currency}
-              onChange={(event) => update("currency", event.target.value)}
-            >
-              <option>USD</option>
-              <option>EUR</option>
-            </select>
-          </Field>
-          <Field label="Port of loading">
-            <input
-              value={form.portLoading}
-              onChange={(event) => update("portLoading", event.target.value)}
-            />
-          </Field>
-          <Field label="Down payment">
-            <input
-              type="number"
-              min="0"
-              max="100"
-              value={form.downPaymentPercent}
-              onChange={(event) =>
-                update("downPaymentPercent", Number(event.target.value))
-              }
-            />
-          </Field>
-        </div>
-        <div className="toggle-row">
-          <div>
-            <strong>Marble invoice background</strong>
-            <small>Add a subtle premium texture to printable documents.</small>
+        {section === "Company" && (
+          <>
+            <div className="form-grid cols-2">
+              <Field label="Company name"><input value={form.companyName} onChange={(event) => update("companyName", event.target.value)} /></Field>
+              <Field label="Tagline"><input value={form.tagline} onChange={(event) => update("tagline", event.target.value)} /></Field>
+              <Field label="Email"><input value={form.email} onChange={(event) => update("email", event.target.value)} /></Field>
+              <Field label="Phone"><input value={form.phone} onChange={(event) => update("phone", event.target.value)} /></Field>
+              <Field label="Tax card"><input value={form.taxCard} onChange={(event) => update("taxCard", event.target.value)} /></Field>
+              <Field label="Commercial registration"><input value={form.commercialRegistration} onChange={(event) => update("commercialRegistration", event.target.value)} /></Field>
+            </div>
+            <Field label="Registered address"><textarea rows={3} value={form.address} onChange={(event) => update("address", event.target.value)} /></Field>
+          </>
+        )}
+        {section === "Bank accounts" && (
+          <div className="form-grid cols-2">
+            <Field label="Bank"><input value={form.bankName} onChange={(event) => update("bankName", event.target.value)} /></Field>
+            <Field label="Branch"><input value={form.bankBranch} onChange={(event) => update("bankBranch", event.target.value)} /></Field>
+            <Field label="Account number"><input value={form.bankAccountNumber} onChange={(event) => update("bankAccountNumber", event.target.value)} /></Field>
+            <Field label="IBAN"><input value={form.bankIban} onChange={(event) => update("bankIban", event.target.value)} /></Field>
+            <Field label="SWIFT / BIC"><input value={form.bankSwift} onChange={(event) => update("bankSwift", event.target.value)} /></Field>
           </div>
-          <button
-            type="button"
-            className={form.marbleBackground ? "toggle on" : "toggle"}
-            onClick={() => update("marbleBackground", !form.marbleBackground)}
-          >
-            <i />
-          </button>
-        </div>
+        )}
+        {section === "Invoice preferences" && (
+          <>
+            <div className="form-grid cols-3">
+              <Field label="Currency"><select value={form.currency} onChange={(event) => update("currency", event.target.value)}><option>USD</option><option>EUR</option><option>GBP</option><option>EGP</option></select></Field>
+              <Field label="Port of loading"><input value={form.portLoading} onChange={(event) => update("portLoading", event.target.value)} /></Field>
+              <Field label="Down payment"><input type="number" min="0" max="100" value={form.downPaymentPercent} onChange={(event) => update("downPaymentPercent", Number(event.target.value))} /></Field>
+            </div>
+            <div className="toggle-row">
+              <div><strong>Marble invoice background</strong><small>Add a subtle premium texture to printable documents.</small></div>
+              <button type="button" className={form.marbleBackground ? "toggle on" : "toggle"} onClick={() => update("marbleBackground", !form.marbleBackground)}><i /></button>
+            </div>
+          </>
+        )}
+        {section === "Users & roles" && (
+          <div className="settings-list">
+            <div><span className="avatar">YM</span><p><strong>Youssef Mohamed</strong><small>youssefmohamedfast@gmail.com</small></p><b>Owner</b></div>
+            <p className="settings-note">This Site is private and currently accessible only to the owner.</p>
+          </div>
+        )}
+        {section === "Audit log" && (
+          <div className="audit-list">
+            <div><Check /><p><strong>Supabase connection verified</strong><small>Today · System</small></p></div>
+            <div><FileText /><p><strong>Invoice records synchronized</strong><small>Today · Youssef Mohamed</small></p></div>
+            <div><Activity /><p><strong>Workspace settings loaded</strong><small>Today · System</small></p></div>
+          </div>
+        )}
         <div className="toggle-row">
           <div>
             <strong>Dark interface</strong>
@@ -2199,7 +2700,7 @@ function SettingsPage({
             <i />
           </button>
         </div>
-        <div className="settings-save">
+        {(section === "Company" || section === "Bank accounts" || section === "Invoice preferences") && <div className="settings-save">
           <button
             className="primary"
             onClick={saveSettings}
@@ -2207,7 +2708,7 @@ function SettingsPage({
             <Check />
             Save changes
           </button>
-        </div>
+        </div>}
       </section>
     </div>
   );

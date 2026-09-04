@@ -19,7 +19,13 @@ export async function GET() {
     const rows = await listSupabaseRecords();
     const invoiceData = rows
       .filter((row) => row.entity_type === "invoice")
-      .map((row) => row.payload);
+      .map((row) => row.payload)
+      .filter(
+        (invoice) =>
+          typeof invoice === "object" &&
+          invoice !== null &&
+          (!("status" in invoice) || invoice.status !== "Archived"),
+      );
     return NextResponse.json({ invoices: invoiceData, source: "supabase" });
   } catch (error) {
     return NextResponse.json(
