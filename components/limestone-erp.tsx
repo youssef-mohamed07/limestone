@@ -4,9 +4,11 @@ import {
   useContext,
   useEffect,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import Image from "next/image";
+import { createPortal } from "react-dom";
 import {
   Activity,
   Archive,
@@ -407,6 +409,19 @@ function Logo({ light = false }: { light?: boolean }) {
         priority
       />
     </div>
+  );
+}
+const subscribeToClient = () => () => undefined;
+function AppPortal({ children }: { children: ReactNode }) {
+  const isClient = useSyncExternalStore(
+    subscribeToClient,
+    () => true,
+    () => false,
+  );
+  if (!isClient) return null;
+  return createPortal(
+    children,
+    document.querySelector(".app-shell") ?? document.body,
   );
 }
 export default function LimestoneERP() {
@@ -1055,9 +1070,11 @@ function PageHeader({
         <button className="secondary" onClick={onExport}>
           <Download /> Export
         </button>
-        <button className="primary" onClick={onNew}>
-          <Plus /> New proforma
-        </button>
+        {(active === "Dashboard" || active === "Invoices") && (
+          <button className="primary" onClick={onNew}>
+            <Plus /> New proforma
+          </button>
+        )}
       </div>
     </div>
   );
@@ -2564,6 +2581,21 @@ function EntityPage({
   const [values, setValues] = useState(() =>
     fields?.map((field) => field.options?.[0] ?? "") ?? [],
   );
+  useEffect(() => {
+    if (!creating && !selectedRow) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setCreating(false);
+      setSelectedRow(null);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [creating, selectedRow]);
   const filterName = columns.at(-1) ?? "Status";
   const statuses = Array.from(new Set(rows.map((row) => row.at(-1) ?? "")));
   const shown = rows.filter(
@@ -2665,101 +2697,128 @@ function EntityPage({
         )}
       </div>
       {creating && fields && (
-        <div className="modal-backdrop" onMouseDown={() => setCreating(false)}>
-          <section
-            className="quick-modal"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <button className="close" onClick={() => setCreating(false)}>
-              <X />
-            </button>
-            <p className="eyebrow">NEW RECORD</p>
-            <h2>{button}</h2>
-            <p>Complete the details below. The record will be saved securely.</p>
-            <div className="modal-grid">
-              {fields.map((field, index) => (
-                <Field label={field.label} key={field.label}>
-                  {field.options ? (
-                    <select
-                      value={values[index]}
-                      onChange={(event) =>
-                        setValues((current) =>
-                          current.map((value, itemIndex) =>
-                            itemIndex === index ? event.target.value : value,
-                          ),
-                        )
-                      }
-                    >
-                      {field.options.map((option) => (
-                        <option key={option}>{option}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      type={field.type ?? "text"}
-                      value={values[index]}
-                      placeholder={field.placeholder}
-                      onChange={(event) =>
-                        setValues((current) =>
-                          current.map((value, itemIndex) =>
-                            itemIndex === index ? event.target.value : value,
-                          ),
-                        )
-                      }
-                    />
-                  )}
-                </Field>
-              ))}
-            </div>
-            <div className="modal-actions">
-              <button className="secondary" onClick={() => setCreating(false)}>
-                Cancel
-              </button>
+        <AppPortal>
+          <div className="modal-backdrop" onMouseDown={() => setCreating(false)}>
+            <form
+              className="quick-modal"
+              onSubmit={(event) => {
+                event.preventDefault();
+                submitCreate();
+              }}
+              onMouseDown={(event) => event.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="create-record-title"
+            >
               <button
-                className="primary"
-                disabled={values.some((value) => !value.trim())}
-                onClick={submitCreate}
+                type="button"
+                className="close"
+                onClick={() => setCreating(false)}
+                aria-label="Close form"
               >
-                <Check /> Save record
+                <X />
               </button>
-            </div>
-          </section>
-        </div>
+              <p className="eyebrow">NEW RECORD</p>
+              <h2 id="create-record-title">{button}</h2>
+              <p>Complete the details below. The record will be saved securely.</p>
+              <div className="modal-grid">
+                {fields.map((field, index) => (
+                  <Field label={field.label} key={field.label}>
+                    {field.options ? (
+                      <select
+                        value={values[index]}
+                        onChange={(event) =>
+                          setValues((current) =>
+                            current.map((value, itemIndex) =>
+                              itemIndex === index ? event.target.value : value,
+                            ),
+                          )
+                        }
+                      >
+                        {field.options.map((option) => (
+                          <option key={option}>{option}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type={field.type ?? "text"}
+                        value={values[index]}
+                        placeholder={field.placeholder}
+                        onChange={(event) =>
+                          setValues((current) =>
+                            current.map((value, itemIndex) =>
+                              itemIndex === index ? event.target.value : value,
+                            ),
+                          )
+                        }
+                      />
+                    )}
+                  </Field>
+                ))}
+              </div>
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => setCreating(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="primary"
+                  disabled={values.some((value) => !value.trim())}
+                >
+                  <Check /> Save record
+                </button>
+              </div>
+            </form>
+          </div>
+        </AppPortal>
       )}
       {selectedRow && (
-        <div className="modal-backdrop" onMouseDown={() => setSelectedRow(null)}>
-          <section
-            className="quick-modal record-modal"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <button className="close" onClick={() => setSelectedRow(null)}>
-              <X />
-            </button>
-            <p className="eyebrow">RECORD DETAILS</p>
-            <h2>{selectedRow[0]}</h2>
-            <div className="record-details">
-              {columns.map((column, index) => (
-                <div key={column}>
-                  <span>{column}</span>
-                  <strong>{selectedRow[index]}</strong>
-                </div>
-              ))}
-            </div>
-            <div className="modal-actions">
+        <AppPortal>
+          <div className="modal-backdrop" onMouseDown={() => setSelectedRow(null)}>
+            <section
+              className="quick-modal record-modal"
+              onMouseDown={(event) => event.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="record-details-title"
+            >
               <button
-                className="secondary"
-                onClick={() =>
-                  downloadCsv(`${selectedRow[0]}.csv`, [columns, selectedRow])
-                }
+                className="close"
+                onClick={() => setSelectedRow(null)}
+                aria-label="Close record details"
               >
-                <Download /> Export row
+                <X />
               </button>
-              <button className="primary" onClick={() => setSelectedRow(null)}>
-                Done
-              </button>
-            </div>
-          </section>
-        </div>
+              <p className="eyebrow">RECORD DETAILS</p>
+              <h2 id="record-details-title">{selectedRow[0]}</h2>
+              <div className="record-details">
+                {columns.map((column, index) => (
+                  <div key={column}>
+                    <span>{column}</span>
+                    <strong>{selectedRow[index]}</strong>
+                  </div>
+                ))}
+              </div>
+              <div className="modal-actions">
+                <button
+                  className="secondary"
+                  onClick={() =>
+                    downloadCsv(`${selectedRow[0]}.csv`, [columns, selectedRow])
+                  }
+                >
+                  <Download /> Export row
+                </button>
+                <button className="primary" onClick={() => setSelectedRow(null)}>
+                  Done
+                </button>
+              </div>
+            </section>
+          </div>
+        </AppPortal>
       )}
     </section>
   );
