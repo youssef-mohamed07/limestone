@@ -1,4 +1,5 @@
 import { headers } from 'next/headers';
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 export type ChatGPTUser = {
@@ -17,12 +18,25 @@ const PERCENT_ENCODED_UTF8 = 'percent-encoded-utf-8';
 const SIGN_IN_PATH = '/signin-with-chatgpt';
 const SIGN_OUT_PATH = '/signout-with-chatgpt';
 const CALLBACK_PATH = '/callback';
+export const VERCEL_SESSION_COOKIE = 'limestone_session';
 
 export async function getChatGPTUser(): Promise<ChatGPTUser | null> {
   const requestHeaders = await headers();
   const userId = requestHeaders.get(USER_ID_HEADER);
   const email = requestHeaders.get(USER_EMAIL_HEADER);
-  if (!userId || !email) return null;
+  if (!userId || !email) {
+    const expectedSession = await getPasswordSessionToken();
+    if (!expectedSession) return null;
+    const cookieStore = await cookies();
+    if (cookieStore.get(VERCEL_SESSION_COOKIE)?.value !== expectedSession)
+      return null;
+    return {
+      userId: 'vercel-owner',
+      displayName: 'Youssef Mohamed',
+      email: process.env.APP_ADMIN_EMAIL ?? 'youssefmohamedfast@gmail.com',
+      fullName: 'Youssef Mohamed',
+    };
+  }
 
   const encodedFullName = requestHeaders.get(USER_FULL_NAME_HEADER);
   const fullName =
@@ -45,7 +59,20 @@ export async function requireChatGPTUser(
   const user = await getChatGPTUser();
   if (user) return user;
 
+  if (process.env.VERCEL || process.env.APP_PASSWORD) {
+    redirect(`/login?return_to=${encodeURIComponent(safeRelativeReturnPath(returnTo))}`);
+  }
   redirect(chatGPTSignInPath(returnTo));
+}
+
+export async function getPasswordSessionToken(): Promise<string | null> {
+  const password = process.env.APP_PASSWORD;
+  if (!password) return null;
+  const bytes = new TextEncoder().encode(`limestone:${password}`);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('');
 }
 
 export function chatGPTSignInPath(returnTo: string): string {
