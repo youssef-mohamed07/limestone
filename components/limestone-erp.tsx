@@ -96,6 +96,8 @@ type Invoice = {
   bankName?: string;
   bankBranch?: string;
   bankSwift?: string;
+  sourceFile?: string;
+  sourceSheet?: string;
 };
 type Customer = {
   id: string;
@@ -588,6 +590,8 @@ export default function LimestoneERP() {
         customer: customer.company,
         customerId: customer.id,
         status: existing?.status ?? "Draft",
+        sourceFile: result.sourceName,
+        sourceSheet: result.sheetName,
         items: result.invoice.items.map((item) => ({
           ...item,
           id: crypto.randomUUID(),
@@ -620,32 +624,12 @@ export default function LimestoneERP() {
       }
     }
 
-    const nextDocuments = [...catalog.documents];
-    for (const result of uniqueResults) {
-      const reference = `PI-${result.invoice.number}`;
-      const alreadyListed = nextDocuments.some(
-        (document) =>
-          document[0] === result.sourceName && document[2] === reference,
-      );
-      if (!alreadyListed) {
-        nextDocuments.unshift([
-          result.sourceName,
-          "Excel Proforma",
-          reference,
-          labelDate(result.invoice.date),
-          "Youssef M.",
-          "Imported",
-        ]);
-      }
-    }
-
     const catalogResponse = await fetch("/api/data", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         customers: nextCustomers,
         products: nextProducts,
-        documents: nextDocuments,
       }),
     });
     if (!catalogResponse.ok) {
@@ -676,7 +660,6 @@ export default function LimestoneERP() {
       ...current,
       customers: nextCustomers,
       products: nextProducts,
-      documents: nextDocuments,
     }));
     setInvoices((current) => [
       ...importedInvoices,
