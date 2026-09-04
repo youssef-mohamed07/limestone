@@ -50,27 +50,17 @@ function readArray(name) {
 const customers = readArray("customers");
 const products = readArray("products");
 const invoices = readArray("seedInvoices");
-const payments = [
-  ["CIB-0827-1042", "Premier Paving & Tiles", "PI-26-27", "27 Aug 2026", "Bank transfer", "$10,098.68"],
-  ["CIB-0820-1618", "Stone World London", "PI-26-26", "20 Aug 2026", "Bank transfer", "$19,887.00"],
-  ["CIB-0818-0904", "Stone World London", "PI-26-26", "18 Aug 2026", "Bank transfer", "$8,523.00"],
-];
-const shipments = [
-  ["SHP-26-018", "Premier Paving & Tiles", "Alexandria to London Gateway", "MAERSK NORFOLK", "12 Sep / 26 Sep", "In Transit"],
-  ["SHP-26-017", "Nordic Stone AB", "Alexandria to Gothenburg", "MSC ANNA", "09 Sep / 23 Sep", "Booked"],
-  ["SHP-26-016", "Stone World London", "Damietta to Felixstowe", "CMA CGM TITUS", "28 Aug / 12 Sep", "Arrived"],
-];
+const payments = [];
+const shipments = [];
 const documents = [
+  ["PI-26-26.pdf", "Proforma Invoice", "PI-26-26", "23 Aug 2026", "Youssef M.", "Final"],
   ["PI-26-27.pdf", "Proforma Invoice", "PI-26-27", "23 Aug 2026", "Youssef M.", "Final"],
-  ["PL-26-26.pdf", "Packing List", "SHP-26-016", "26 Aug 2026", "Omar H.", "Final"],
-  ["BL-MAE884290.pdf", "Bill of Lading", "SHP-26-018", "02 Sep 2026", "Omar H.", "Verified"],
-  ["COO-26-016.pdf", "Certificate of Origin", "PI-26-26", "27 Aug 2026", "Youssef M.", "Final"],
 ];
 const settings = {
   companyName: "Limestone for Marble and Granite",
   tagline: "Egyptian Natural Stone Exporter",
   email: "mohamed@loldlimestone.net",
-  phone: "+20 111 121 0056",
+  phone: "+20 111 121 0056 - +20 106 610 1017",
   taxCard: "773-932-488",
   commercialRegistration: "6724 / 9",
   address: "56 Ragheb Street, Helwan, 4th Floor, Cairo, Egypt",
@@ -188,6 +178,10 @@ try {
       { id: "files:documents", type: "documents", payload: documents },
       { id: "settings:company", type: "settings", payload: settings },
     ];
+
+    // The source workbooks are authoritative. Remove prior demo records before
+    // writing the real invoice dataset so stale mock entities cannot reappear.
+    await transaction`delete from public.limestone_records`;
 
     for (const record of records) {
       await transaction`

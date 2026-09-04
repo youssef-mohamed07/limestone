@@ -143,129 +143,63 @@ const customers: Customer[] = [
   {
     id: "cus-premier",
     company: "Premier Paving & Tiles",
-    contact: "James Wilson",
-    email: "accounts@premierpaving.co.uk",
-    phone: "+44 1702 555 198",
+    contact: "",
+    email: "",
+    phone: "",
     country: "United Kingdom",
     city: "Rochford, Essex",
     vat: "GB150541542",
     port: "London Gateway",
     status: "Active",
   },
-  {
-    id: "cus-stone",
-    company: "Stone World London",
-    contact: "Emma Clarke",
-    email: "emma@stoneworld.co.uk",
-    phone: "+44 20 7946 0281",
-    country: "United Kingdom",
-    city: "London",
-    vat: "GB884210399",
-    port: "Felixstowe",
-    status: "Active",
-  },
-  {
-    id: "cus-nordic",
-    company: "Nordic Stone AB",
-    contact: "Lars Eriksson",
-    email: "lars@nordicstone.se",
-    phone: "+46 8 410 245 10",
-    country: "Sweden",
-    city: "Stockholm",
-    vat: "SE556102938701",
-    port: "Gothenburg",
-    status: "Active",
-  },
-  {
-    id: "cus-maison",
-    company: "Maison Pierre SAS",
-    contact: "Camille Laurent",
-    email: "c.laurent@maisonpierre.fr",
-    phone: "+33 1 84 80 20 18",
-    country: "France",
-    city: "Paris",
-    vat: "FR40392187321",
-    port: "Le Havre",
-    status: "Active",
-  },
 ];
 const products: Product[] = [
   {
-    id: "p1",
+    id: "sinai-pearl-acid-tumbled-900-600-20",
+    name: "Sinai Pearl",
+    type: "Limestone",
+    finish: "Acid + Tumbled",
+    size: "900 × 600 × 20 mm",
+    unit: "m²",
+    price: 23,
+    hs: "68-02-21",
+    available: true,
+  },
+  {
+    id: "sinai-pearl-honed-tumbled-900-600-20",
+    name: "Sinai Pearl",
+    type: "Limestone",
+    finish: "Honed + Tumbled",
+    size: "900 × 600 × 20 mm",
+    unit: "m²",
+    price: 21,
+    hs: "68-02-21",
+    available: true,
+  },
+  {
+    id: "sinai-pearl-honed-300-600-30",
+    name: "Sinai Pearl",
+    type: "Limestone",
+    finish: "Honed",
+    size: "300 × 600 × 30 mm",
+    unit: "m²",
+    price: 1,
+    hs: "68-02-21",
+    available: true,
+  },
+  {
+    id: "sinai-pearl-acid-tumbled-50-200-30",
     name: "Sinai Pearl",
     type: "Limestone",
     finish: "Acid + Tumbled",
     size: "50 × 200 × 30 mm",
     unit: "m²",
-    price: 23,
-    hs: "680292",
-    available: true,
-  },
-  {
-    id: "p2",
-    name: "Galala",
-    type: "Marble",
-    finish: "Honed",
-    size: "900 × 600 × 20 mm",
-    unit: "m²",
-    price: 28.5,
-    hs: "680291",
-    available: true,
-  },
-  {
-    id: "p3",
-    name: "Sunny Menia",
-    type: "Limestone",
-    finish: "Brushed",
-    size: "300 × 600 × 30 mm",
-    unit: "m²",
-    price: 24.75,
-    hs: "680292",
-    available: true,
-  },
-  {
-    id: "p4",
-    name: "Silvia Menia",
-    type: "Limestone",
-    finish: "Sandblasted",
-    size: "600 × 400 × 20 mm",
-    unit: "m²",
-    price: 26.25,
-    hs: "680292",
+    price: 13,
+    hs: "68-02-21",
     available: true,
   },
 ];
 const seedInvoices: Invoice[] = [
-  {
-    id: "inv-27",
-    number: "26-27",
-    date: "2026-08-23",
-    customer: "Premier Paving & Tiles",
-    customerId: "cus-premier",
-    currency: "USD",
-    status: "Production",
-    items: [
-      {
-        id: "i1",
-        description: "Sinai Pearl",
-        finish: "Acid + Tumbled",
-        size: "50 × 200 × 30 mm",
-        quantity: 1624.55,
-        unit: "m²",
-        unitPriceMinor: 2300,
-        hsCode: "680292",
-        crates: 72,
-      },
-    ],
-    containers: 4,
-    containerType: "20′ GP",
-    freightPerContainerMinor: 76000,
-    downPaymentPercent: 25,
-    paidMinor: 1009868,
-    portLoading: "Any Egyptian Port",
-    portDischarge: "London Gateway",
-    notes: "Goods remain property of seller until full payment.",
-  },
   {
     id: "inv-26",
     number: "26-26",
@@ -273,13 +207,13 @@ const seedInvoices: Invoice[] = [
     customer: "Premier Paving & Tiles",
     customerId: "cus-premier",
     currency: "USD",
-    status: "Sent",
+    status: "Final",
     items: [
-      { id: "i2a", description: "Sinai Pearl", finish: "Acid + Tumbled", size: "900 × 600 × 20 mm", quantity: 529, unit: "m²", unitPriceMinor: 2300, hsCode: "68-02-21", crates: 23, marks: "N\\M" },
-      { id: "i2b", description: "Sinai Pearl", finish: "Acid + Tumbled", size: "900 × 600 × 20 mm", quantity: 529, unit: "m²", unitPriceMinor: 2300, hsCode: "68-02-21", crates: 23, marks: "N\\M" },
-      { id: "i2c", description: "Sinai Pearl", finish: "Honed + Tumbled", size: "900 × 600 × 20 mm", quantity: 396.9, unit: "m²", unitPriceMinor: 2100, hsCode: "68-02-21", crates: 20, marks: "N\\M" },
-      { id: "i2d", description: "Sinai Pearl", finish: "Honed", size: "300 × 600 × 30 mm", quantity: 86.4, unit: "m²", unitPriceMinor: 100, hsCode: "68-02-21", crates: 8, marks: "N\\M" },
-      { id: "i2e", description: "Sinai Pearl", finish: "Acid + Tumbled", size: "50 × 200 × 30 mm", quantity: 353.8, unit: "m²", unitPriceMinor: 1300, hsCode: "68-02-21", crates: 40, marks: "N\\M" },
+      { id: "26-26-1", description: "Sinai Pearl", finish: "Acid + Tumbled", size: "900 × 600 × 20 mm", quantity: 529, unit: "m²", unitPriceMinor: 2300, hsCode: "68-02-21", crates: 0, marks: "N\\M" },
+      { id: "26-26-2", description: "Sinai Pearl", finish: "Acid + Tumbled", size: "900 × 600 × 20 mm", quantity: 529, unit: "m²", unitPriceMinor: 2300, hsCode: "68-02-21", crates: 0, marks: "N\\M" },
+      { id: "26-26-3", description: "Sinai Pearl", finish: "Honed + Tumbled", size: "900 × 600 × 20 mm", quantity: 396.9, unit: "m²", unitPriceMinor: 2100, hsCode: "68-02-21", crates: 0, marks: "N\\M" },
+      { id: "26-26-4", description: "Sinai Pearl", finish: "Honed", size: "300 × 600 × 30 mm", quantity: 86.4, unit: "m²", unitPriceMinor: 100, hsCode: "68-02-21", crates: 0, marks: "N\\M" },
+      { id: "26-26-5", description: "Sinai Pearl", finish: "Acid + Tumbled", size: "50 × 200 × 30 mm", quantity: 353.8, unit: "m²", unitPriceMinor: 1300, hsCode: "68-02-21", crates: 0, marks: "N\\M" },
     ],
     containers: 4,
     containerType: "20′ GP",
@@ -288,20 +222,20 @@ const seedInvoices: Invoice[] = [
     paidMinor: 0,
     portLoading: "Any Egyptian Port",
     portDischarge: "London Gateway",
-    notes: "",
+    notes: "Goods remain property of seller until full payment.",
     commercialRegistration: "6724 / 9",
     taxCard: "773-932-488",
     sellerName: "Limestone for Marble and Granite",
     sellerAddress: "56 Ragheb Street, Helwan, 4th Floor, Cairo, Egypt",
     sellerPhone: "+20 111 121 0056 - +20 106 610 1017",
     sellerEmail: "mohamed@loldlimestone.net",
-    shipToAddress: "Premier Paving & Tiles, 29s Purdeys Way, Rochford, Essex, United Kingdom, SS4 1 ND",
+    shipToAddress: "Premier Paving & Tiles, 29s Purdeys Way, Rochford, Essex, United Kingdom, SS4 1ND",
     originCountry: "EGYPT",
     hsCode: "68-02-21",
     grossWeightKg: 27000,
     netWeightKg: 26000,
     totalCrates: 114,
-    incoterm: "CFR",
+    incoterm: "FOB",
     paymentTerms: "25% DOWN PAYMENT AND THE REST UPON RECEIPT OF DOCUMENTS",
     bankAccountNumber: "100073581782",
     bankIban: "EG070010019200000100073581782",
@@ -311,87 +245,68 @@ const seedInvoices: Invoice[] = [
     bankSwift: "CIBEEGCX192",
   },
   {
-    id: "inv-25",
-    number: "26-25",
-    date: "2026-08-12",
-    customer: "Nordic Stone AB",
-    customerId: "cus-nordic",
-    currency: "EUR",
-    status: "Approved",
+    id: "inv-27",
+    number: "26-27",
+    date: "2026-08-23",
+    customer: "Premier Paving & Tiles",
+    customerId: "cus-premier",
+    currency: "USD",
+    status: "Final",
     items: [
       {
-        id: "i3",
-        description: "Sunny Menia",
-        finish: "Brushed",
-        size: "300 × 600 × 30 mm",
-        quantity: 680,
+        id: "26-27-1",
+        description: "Sinai Pearl",
+        finish: "Acid + Tumbled",
+        size: "50 × 200 × 30 mm",
+        quantity: 353.8,
         unit: "m²",
-        unitPriceMinor: 2475,
-        hsCode: "680292",
-        crates: 35,
+        unitPriceMinor: 1300,
+        hsCode: "68-02-21",
+        crates: 29,
+        marks: "N\\M",
       },
     ],
-    containers: 2,
+    containers: 1,
     containerType: "20′ GP",
-    freightPerContainerMinor: 91000,
-    downPaymentPercent: 30,
-    paidMinor: 559500,
-    portLoading: "Alexandria",
-    portDischarge: "Gothenburg",
-    notes: "",
-  },
-  {
-    id: "inv-24",
-    number: "26-24",
-    date: "2026-08-04",
-    customer: "Maison Pierre SAS",
-    customerId: "cus-maison",
-    currency: "EUR",
-    status: "Sent",
-    items: [
-      {
-        id: "i4",
-        description: "Silvia Menia",
-        finish: "Sandblasted",
-        size: "600 × 400 × 20 mm",
-        quantity: 1160,
-        unit: "m²",
-        unitPriceMinor: 2625,
-        hsCode: "680292",
-        crates: 54,
-      },
-    ],
-    containers: 3,
-    containerType: "40′ GP",
-    freightPerContainerMinor: 57000,
+    freightPerContainerMinor: 76000,
     downPaymentPercent: 25,
     paidMinor: 0,
-    portLoading: "Damietta",
-    portDischarge: "Le Havre",
-    notes: "",
+    portLoading: "Any Egyptian Port",
+    portDischarge: "London Gateway",
+    notes: "Goods remain property of seller until full payment.",
+    commercialRegistration: "6724 / 9",
+    taxCard: "773-932-488",
+    sellerName: "Limestone for Marble and Granite",
+    sellerAddress: "56 Ragheb Street, Helwan, 4th Floor, Cairo, Egypt",
+    sellerPhone: "+20 111 121 0056 - +20 106 610 1017",
+    sellerEmail: "mohamed@loldlimestone.net",
+    shipToAddress: "Premier Paving & Tiles, 29s Purdeys Way, Rochford, Essex, United Kingdom, SS4 1ND",
+    originCountry: "EGYPT",
+    hsCode: "68-02-21",
+    grossWeightKg: 27000,
+    netWeightKg: 26000,
+    totalCrates: 29,
+    incoterm: "FOB",
+    paymentTerms: "25% DOWN PAYMENT AND THE REST UPON RECEIPT OF DOCUMENTS",
+    bankAccountNumber: "100073581782",
+    bankIban: "EG070010019200000100073581782",
+    bankCompanyName: "Limestone for Marble and Granite",
+    bankName: "BANQUE CIB",
+    bankBranch: "Helwan",
+    bankSwift: "CIBEEGCX192",
   },
 ];
-const seedPayments = [
-  ["CIB-0827-1042", "Premier Paving & Tiles", "PI-26-27", "27 Aug 2026", "Bank transfer", "$10,098.68"],
-  ["CIB-0820-1618", "Stone World London", "PI-26-26", "20 Aug 2026", "Bank transfer", "$19,887.00"],
-  ["CIB-0818-0904", "Stone World London", "PI-26-26", "18 Aug 2026", "Bank transfer", "$8,523.00"],
-];
-const seedShipments = [
-  ["SHP-26-018", "Premier Paving & Tiles", "Alexandria to London Gateway", "MAERSK NORFOLK", "12 Sep / 26 Sep", "In Transit"],
-  ["SHP-26-017", "Nordic Stone AB", "Alexandria to Gothenburg", "MSC ANNA", "09 Sep / 23 Sep", "Booked"],
-  ["SHP-26-016", "Stone World London", "Damietta to Felixstowe", "CMA CGM TITUS", "28 Aug / 12 Sep", "Arrived"],
-];
+const seedPayments: string[][] = [];
+const seedShipments: string[][] = [];
 const seedDocuments = [
+  ["PI-26-26.pdf", "Proforma Invoice", "PI-26-26", "23 Aug 2026", "Youssef M.", "Final"],
   ["PI-26-27.pdf", "Proforma Invoice", "PI-26-27", "23 Aug 2026", "Youssef M.", "Final"],
-  ["PL-26-26.pdf", "Packing List", "SHP-26-016", "26 Aug 2026", "Omar H.", "Final"],
-  ["BL-MAE884290.pdf", "Bill of Lading", "SHP-26-018", "02 Sep 2026", "Omar H.", "Verified"],
-  ["COO-26-016.pdf", "Certificate of Origin", "PI-26-26", "27 Aug 2026", "Youssef M.", "Final"],
 ];
 const seedSettings: CompanySettings = {
   companyName: "Limestone for Marble and Granite",
   tagline: "Egyptian Natural Stone Exporter",
   email: "mohamed@loldlimestone.net",
-  phone: "+20 111 121 0056",
+  phone: "+20 111 121 0056 - +20 106 610 1017",
   taxCard: "773-932-488",
   commercialRegistration: "6724 / 9",
   address: "56 Ragheb Street, Helwan, 4th Floor, Cairo, Egypt",
@@ -509,14 +424,8 @@ export default function LimestoneERP() {
         return (await response.json()) as { invoices?: Invoice[] };
       })
       .then((data) => {
-        if (!activeRequest || !data?.invoices?.length) return;
-        setInvoices((current) => {
-          const storedIds = new Set(data.invoices?.map((invoice) => invoice.id));
-          return [
-            ...(data.invoices ?? []),
-            ...current.filter((invoice) => !storedIds.has(invoice.id)),
-          ];
-        });
+        if (!activeRequest || !data?.invoices) return;
+        setInvoices(data.invoices);
       })
       .catch(() => undefined);
     return () => {
@@ -761,26 +670,14 @@ export default function LimestoneERP() {
                 <strong>Notifications</strong>
                 <button
                   onClick={() => {
-                    setActive("Payments");
+                    setActive("Invoices");
                     setNotificationsOpen(false);
                   }}
                 >
-                  <Banknote />
+                  <FileText />
                   <span>
-                    Payment received
-                    <small>$10,098.68 · Today</small>
-                  </span>
-                </button>
-                <button
-                  onClick={() => {
-                    setActive("Shipments");
-                    setNotificationsOpen(false);
-                  }}
-                >
-                  <Ship />
-                  <span>
-                    Shipment update
-                    <small>MSKU-884290 is in transit</small>
+                    Real invoice data synchronized
+                    <small>{invoices.length} proforma invoices available</small>
                   </span>
                 </button>
               </div>
@@ -908,7 +805,11 @@ export default function LimestoneERP() {
               />
             )}{" "}
             {active === "Reports" && (
-              <ReportsPage invoices={invoices} onExport={exportCurrentPage} />
+              <ReportsPage
+                invoices={invoices}
+                customers={catalog.customers}
+                onExport={exportCurrentPage}
+              />
             )}{" "}
             {active === "Settings" && (
               <SettingsPage
@@ -1028,16 +929,19 @@ function Dashboard({
   onShipments: () => void;
 }) {
   const sales = invoices.reduce((s, i) => s + totalOf(i).grandTotalMinor, 0),
-    paid = invoices.reduce((s, i) => s + i.paidMinor, 0);
+    paid = invoices.reduce((s, i) => s + i.paidMinor, 0),
+    customerCount = new Set(invoices.map((invoice) => invoice.customerId)).size,
+    containerCount = invoices.reduce((sum, invoice) => sum + invoice.containers, 0),
+    collectedPercent = sales > 0 ? Math.round((paid / sales) * 100) : 0;
   return (
     <>
       <div className="overview-row">
         <section className="hero-card">
           <div>
-            <p>NET SALES · THIS MONTH</p>
+            <p>TOTAL PROFORMA VALUE</p>
             <h2>{currency(sales)}</h2>
             <span>
-              <b>↗ 12.8%</b> from last month
+              <b>{invoices.length} real invoices</b> imported from Excel
             </span>
           </div>
           <div className="mini-chart">
@@ -1054,25 +958,25 @@ function Dashboard({
           <p>OUTSTANDING BALANCE</p>
           <h2>{currency(sales - paid)}</h2>
           <div className="progress">
-            <i style={{ width: `${Math.round((paid / sales) * 100)}%` }} />
+            <i style={{ width: `${collectedPercent}%` }} />
           </div>
           <div>
             <span>{currency(paid)} collected</span>
-            <b>{Math.round((paid / sales) * 100)}%</b>
+            <b>{collectedPercent}%</b>
           </div>
         </section>
       </div>
       <div className="kpi-grid">
         {[
-          [FileText, "Total invoices", String(invoices.length), "4 this month"],
+          [FileText, "Total invoices", String(invoices.length), "Source workbooks"],
           [
             CircleDollarSign,
             "Payments received",
             currency(paid),
-            "3 transactions",
+            "0 recorded transactions",
           ],
-          [Users, "Active customers", "18", "2 new this month"],
-          [Container, "Containers shipped", "32", "6 in transit"],
+          [Users, "Active customers", String(customerCount), "Premier Paving & Tiles"],
+          [Container, "Export containers", String(containerCount), "Listed on the proformas"],
         ].map(([Icon, label, value, detail]) => (
           <article className="kpi" key={String(label)}>
             <div className="kpi-icon">
@@ -1099,44 +1003,36 @@ function Dashboard({
           <div className="panel-head">
             <div>
               <h3>Next shipment</h3>
-              <p>Booking MSKU-884290</p>
+              <p>No vessel schedule supplied</p>
             </div>
-            <span className="status in-transit">In transit</span>
+            <span className="status draft">Not recorded</span>
           </div>
           <div className="route">
             <div>
-              <strong>EGALY</strong>
-              <small>Alexandria</small>
-              <b>12 SEP</b>
+              <strong>EGYPT</strong>
+              <small>Any Egyptian Port</small>
+              <b>—</b>
             </div>
             <div className="route-line">
               <Ship />
             </div>
             <div>
-              <strong>GBLGP</strong>
+              <strong>UNITED KINGDOM</strong>
               <small>London Gateway</small>
-              <b>26 SEP</b>
+              <b>—</b>
             </div>
           </div>
           <div className="shipment-meta">
             <div>
               <span>Vessel</span>
-              <strong>MAERSK NORFOLK</strong>
+              <strong>Not specified</strong>
             </div>
             <div>
               <span>Containers</span>
-              <strong>4 × 20′ GP</strong>
+              <strong>{containerCount} × 20′ GP</strong>
             </div>
           </div>
-          <button className="track" onClick={onShipments}>Track shipment</button>
-          <div className="payment-note">
-            <span>$</span>
-            <div>
-              <strong>Payment received</strong>
-              <p>$10,098.68 from Premier Paving</p>
-              <small>Today, 10:42 AM</small>
-            </div>
-          </div>
+          <button className="track" onClick={onShipments}>Add shipment details</button>
         </aside>
       </div>
     </>
@@ -2489,13 +2385,28 @@ function EntityPage({
 }
 function ReportsPage({
   invoices,
+  customers,
   onExport,
 }: {
   invoices: Invoice[];
+  customers: Customer[];
   onExport: () => void;
 }) {
-  const values = [42, 58, 47, 73, 62, 86, 100, 72, 91, 78, 95, 88],
-    max = Math.max(...values);
+  const values = Array.from({ length: 12 }, () => 0);
+  const countryTotals = new Map<string, number>();
+  let total = 0;
+  for (const invoice of invoices) {
+    const invoiceTotal = totalOf(invoice).grandTotalMinor;
+    const month = new Date(`${invoice.date}T12:00:00`).getMonth();
+    values[month] += invoiceTotal;
+    total += invoiceTotal;
+    const customer = customers.find((entry) => entry.id === invoice.customerId);
+    const country = customer?.country || "Unspecified";
+    countryTotals.set(country, (countryTotals.get(country) ?? 0) + invoiceTotal);
+  }
+  const max = Math.max(...values, 1);
+  const countries = [...countryTotals.entries()].sort((a, b) => b[1] - a[1]);
+  const topCountry = countries[0] ?? ["No data", 0];
   return (
     <div className="reports-grid">
       <section className="panel report-main">
@@ -2509,7 +2420,7 @@ function ReportsPage({
         <div className="bar-chart">
           {values.map((v, i) => (
             <div key={i}>
-              <span>{v > 80 ? `$${v}k` : ""}</span>
+              <span>{v > 0 ? `$${(v / 100000).toFixed(1)}k` : ""}</span>
               <i style={{ height: `${(v / max) * 100}%` }} />
               <small>
                 {
@@ -2529,37 +2440,36 @@ function ReportsPage({
             <p>Top destinations</p>
           </div>
         </div>
-        {[
-          ["United Kingdom", 58],
-          ["Sweden", 22],
-          ["France", 14],
-          ["Germany", 6],
-        ].map(([n, v]) => (
+        {countries.map(([n, amount]) => {
+          const share = total > 0 ? Math.round((amount / total) * 100) : 0;
+          return (
           <div className="country-row" key={n}>
             <span>{n}</span>
             <div>
-              <i style={{ width: `${v}%` }} />
+              <i style={{ width: `${share}%` }} />
             </div>
-            <b>{v}%</b>
+            <b>{share}%</b>
           </div>
-        ))}
+          );
+        })}
       </section>
       <section className="panel report-stat">
         <Globe2 />
         <span>Top destination</span>
-        <strong>United Kingdom</strong>
-        <small>$100,982 · 58% of sales</small>
+        <strong>{topCountry[0]}</strong>
+        <small>{currency(topCountry[1])} · {total > 0 ? Math.round((topCountry[1] / total) * 100) : 0}% of sales</small>
       </section>
       <section className="panel report-stat">
         <Gauge />
         <span>Average invoice</span>
         <strong>
           {currency(
-            invoices.reduce((s, i) => s + totalOf(i).grandTotalMinor, 0) /
-              invoices.length,
+            invoices.length > 0
+              ? total / invoices.length
+              : 0,
           )}
         </strong>
-        <small>↑ 8.2% year over year</small>
+        <small>Across {invoices.length} real invoices</small>
       </section>
     </div>
   );
