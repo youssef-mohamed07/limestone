@@ -179,9 +179,12 @@ try {
       { id: "settings:company", type: "settings", payload: settings },
     ];
 
-    // The source workbooks are authoritative. Remove prior demo records before
-    // writing the real invoice dataset so stale mock entities cannot reappear.
-    await transaction`delete from public.limestone_records`;
+    // Remove only the two known demo invoices. Never clear the full records
+    // table because it may already contain invoices imported by the user.
+    await transaction`
+      delete from public.limestone_records
+      where id in ('invoice:inv-24', 'invoice:inv-25')
+    `;
 
     for (const record of records) {
       await transaction`

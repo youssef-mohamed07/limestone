@@ -21,6 +21,7 @@ import {
   Container,
   Copy,
   Download,
+  FileSpreadsheet,
   FileText,
   Gauge,
   Globe2,
@@ -35,11 +36,17 @@ import {
   Ship,
   Trash2,
   TrendingUp,
+  Upload,
   Users,
   WalletCards,
   X,
 } from "lucide-react";
 import { calculateInvoiceTotals } from "../lib/calculations";
+import {
+  parseProformaSheet,
+  type ParsedProforma,
+  type SpreadsheetCell,
+} from "../lib/proforma-import";
 type Item = {
   id: string;
   description: string;
@@ -405,6 +412,7 @@ export default function LimestoneERP() {
   const [invoices, setInvoices] = useState(seedInvoices);
   const [query, setQuery] = useState("");
   const [builder, setBuilder] = useState(false);
+  const [importer, setImporter] = useState(false);
   const [detail, setDetail] = useState<Invoice | null>(null);
   const [toast, setToast] = useState("");
   const [mobileNav, setMobileNav] = useState(false);
@@ -539,6 +547,151 @@ export default function LimestoneERP() {
     setInvoices((current) => current.filter((item) => item.id !== invoice.id));
     if (detail?.id === invoice.id) setDetail(null);
     persistInvoice(archived, `Proforma ${invoice.number} archived`);
+  };
+  const importProformas = async (parsedResults: ParsedProforma[]) => {
+    const uniqueResults = [
+      ...new Map(
+        parsedResults.map((result) => [result.invoice.number, result]),
+      ).values(),
+    ];
+    const nextCustomers = [...catalog.customers];
+    const importedInvoices: Invoice[] = uniqueResults.map((result) => {
+      let customer = nextCustomers.find(
+        (entry) =>
+          entry.company.toLowerCase() === result.customer.company.toLowerCase(),
+      );
+      if (!customer) {
+        const slug = result.customer.company
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "");
+        customer = {
+          id: `cus-${slug || crypto.randomUUID()}`,
+          company: result.customer.company,
+          contact: "",
+          email: "",
+          phone: "",
+          country: result.customer.country,
+          city: result.customer.city,
+          vat: result.customer.vat,
+          port: result.customer.port,
+          status: "Active",
+        };
+        nextCustomers.push(customer);
+      }
+      const existing = invoices.find(
+        (invoice) => invoice.number === result.invoice.number,
+      );
+      return {
+        ...result.invoice,
+        id: existing?.id ?? crypto.randomUUID(),
+        customer: customer.company,
+        customerId: customer.id,
+        status: existing?.status ?? "Draft",
+        items: result.invoice.items.map((item) => ({
+          ...item,
+          id: crypto.randomUUID(),
+        })),
+      };
+    });
+
+    const nextProducts = [...catalog.products];
+    for (const invoice of importedInvoices) {
+      for (const item of invoice.items) {
+        const exists = nextProducts.some(
+          (product) =>
+            product.name.toLowerCase() === item.description.toLowerCase() &&
+            product.finish.toLowerCase() === item.finish.toLowerCase() &&
+            product.size.toLowerCase() === item.size.toLowerCase(),
+        );
+        if (!exists) {
+          nextProducts.push({
+            id: crypto.randomUUID(),
+            name: item.description,
+            type: "Limestone",
+            finish: item.finish,
+            size: item.size,
+            unit: item.unit,
+            price: item.unitPriceMinor / 100,
+            hs: item.hsCode,
+            available: true,
+          });
+        }
+      }
+    }
+
+    const nextDocuments = [...catalog.documents];
+    for (const result of uniqueResults) {
+      const reference = `PI-${result.invoice.number}`;
+      const alreadyListed = nextDocuments.some(
+        (document) =>
+          document[0] === result.sourceName && document[2] === reference,
+      );
+      if (!alreadyListed) {
+        nextDocuments.unshift([
+          result.sourceName,
+          "Excel Proforma",
+          reference,
+          labelDate(result.invoice.date),
+          "Youssef M.",
+          "Imported",
+        ]);
+      }
+    }
+
+    const catalogResponse = await fetch("/api/data", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customers: nextCustomers,
+        products: nextProducts,
+        documents: nextDocuments,
+      }),
+    });
+    if (!catalogResponse.ok) {
+      const result = (await catalogResponse.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      throw new Error(result?.error ?? "Unable to save imported catalog data");
+    }
+
+    const responses = await Promise.all(
+      importedInvoices.map((invoice) =>
+        fetch("/api/invoices", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(invoice),
+        }),
+      ),
+    );
+    const failed = responses.find((response) => !response.ok);
+    if (failed) {
+      const result = (await failed.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      throw new Error(result?.error ?? "Unable to save an imported invoice");
+    }
+
+    setCatalog((current) => ({
+      ...current,
+      customers: nextCustomers,
+      products: nextProducts,
+      documents: nextDocuments,
+    }));
+    setInvoices((current) => [
+      ...importedInvoices,
+      ...current.filter(
+        (invoice) =>
+          !importedInvoices.some(
+            (imported) => imported.number === invoice.number,
+          ),
+      ),
+    ]);
+    setImporter(false);
+    setActive("Invoices");
+    notify(
+      `${importedInvoices.length} proforma${importedInvoices.length === 1 ? "" : "s"} imported and saved`,
+    );
   };
   const exportCurrentPage = () => {
     if (active === "Invoices" || active === "Dashboard" || active === "Reports") {
@@ -746,6 +899,7 @@ export default function LimestoneERP() {
                 onDuplicate={duplicate}
                 onDelete={archiveInvoice}
                 onNew={() => setBuilder(true)}
+                onImport={() => setImporter(true)}
               />
             )}{" "}
             {active === "Customers" && (
@@ -874,6 +1028,14 @@ export default function LimestoneERP() {
           initial={detail ?? undefined}
           onClose={() => setBuilder(false)}
           onSave={saveInvoice}
+        />
+      )}{" "}
+      {importer && (
+        <ExcelImportModal
+          existingInvoices={invoices}
+          settings={catalog.settings}
+          onClose={() => setImporter(false)}
+          onImport={importProformas}
         />
       )}{" "}
       {toast && (
@@ -1136,12 +1298,14 @@ function InvoicesPage({
   onDuplicate,
   onDelete,
   onNew,
+  onImport,
 }: {
   invoices: Invoice[];
   onOpen: (i: Invoice) => void;
   onDuplicate: (i: Invoice) => void;
   onDelete: (invoice: Invoice) => void;
   onNew: () => void;
+  onImport: () => void;
 }) {
   const [tab, setTab] = useState("All");
   const [dateRange, setDateRange] = useState("all");
@@ -1208,6 +1372,9 @@ function InvoicesPage({
               ))}
             </select>
           </label>
+          <button className="secondary import-button" onClick={onImport}>
+            <Upload /> Import Excel
+          </button>
           <button className="primary" onClick={onNew}>
             <Plus /> Create invoice
           </button>
@@ -1220,6 +1387,237 @@ function InvoicesPage({
         onDelete={onDelete}
       />
     </section>
+  );
+}
+function ExcelImportModal({
+  existingInvoices,
+  settings,
+  onClose,
+  onImport,
+}: {
+  existingInvoices: Invoice[];
+  settings: CompanySettings;
+  onClose: () => void;
+  onImport: (results: ParsedProforma[]) => Promise<void>;
+}) {
+  const [results, setResults] = useState<ParsedProforma[]>([]);
+  const [reading, setReading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const validResults = results.filter(
+    (result) =>
+      result.invoice.number &&
+      result.invoice.date &&
+      result.customer.company &&
+      result.invoice.items.length > 0,
+  );
+  const uniqueValidResults = [
+    ...new Map(
+      validResults.map((result) => [result.invoice.number, result]),
+    ).values(),
+  ];
+
+  const readFiles = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setReading(true);
+    setError("");
+    setResults([]);
+    try {
+      const { default: readExcelFile } = await import(
+        "read-excel-file/browser"
+      );
+      const parsed: ParsedProforma[] = [];
+      for (const file of Array.from(files)) {
+        if (!file.name.toLowerCase().endsWith(".xlsx")) {
+          throw new Error(`${file.name} is not an .xlsx Excel file`);
+        }
+        const sheets = (await readExcelFile(file)) as {
+          sheet: string;
+          data: SpreadsheetCell[][];
+        }[];
+        for (const sheet of sheets) {
+          const hasInvoice = sheet.data.some((row) =>
+            row.some((cell) =>
+              String(cell ?? "")
+                .toUpperCase()
+                .includes("INVOICE NO"),
+            ),
+          );
+          if (!hasInvoice) continue;
+          parsed.push(
+            parseProformaSheet(sheet.data, file.name, sheet.sheet, {
+              commercialRegistration: settings.commercialRegistration,
+              taxCard: settings.taxCard,
+              sellerName: settings.companyName,
+              sellerAddress: settings.address,
+              sellerPhone: settings.phone,
+              sellerEmail: settings.email,
+              downPaymentPercent: settings.downPaymentPercent,
+              bankAccountNumber: settings.bankAccountNumber,
+              bankIban: settings.bankIban,
+              bankCompanyName: settings.companyName,
+              bankName: settings.bankName,
+              bankBranch: settings.bankBranch,
+              bankSwift: settings.bankSwift,
+            }),
+          );
+        }
+      }
+      if (!parsed.length) {
+        throw new Error(
+          "No proforma invoice sheets were found. Use the same layout as your existing Proforma files.",
+        );
+      }
+      setResults(parsed);
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Unable to read this Excel file",
+      );
+    } finally {
+      setReading(false);
+    }
+  };
+
+  const confirmImport = async () => {
+    if (!uniqueValidResults.length) return;
+    setSaving(true);
+    setError("");
+    try {
+      await onImport(uniqueValidResults);
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "The imported invoices could not be saved",
+      );
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop import-backdrop" role="presentation">
+      <section
+        className="quick-modal excel-import-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="excel-import-title"
+      >
+        <button className="close" onClick={onClose} aria-label="Close import">
+          <X />
+        </button>
+        <p className="eyebrow">EXCEL IMPORT</p>
+        <h2 id="excel-import-title">Import proforma invoices</h2>
+        <p>
+          Select one or more Excel files. Every invoice sheet is checked before
+          anything is saved.
+        </p>
+
+        <label className="excel-dropzone">
+          <input
+            type="file"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            multiple
+            disabled={reading || saving}
+            onChange={(event) => void readFiles(event.target.files)}
+          />
+          <span>
+            {reading ? <Activity className="spin" /> : <FileSpreadsheet />}
+          </span>
+          <strong>{reading ? "Reading Excel sheets…" : "Choose Excel files"}</strong>
+          <small>.xlsx · multiple files supported</small>
+        </label>
+
+        {error && (
+          <div className="import-error" role="alert">
+            <b>!</b>
+            <span>{error}</span>
+          </div>
+        )}
+
+        {results.length > 0 && (
+          <div className="import-results" aria-live="polite">
+            <div className="import-summary">
+              <strong>{uniqueValidResults.length} ready to import</strong>
+              <span>
+                {results.reduce(
+                  (sum, result) => sum + result.invoice.items.length,
+                  0,
+                )}{" "}
+                line items found
+              </span>
+            </div>
+            {results.map((result, index) => {
+              const existing = existingInvoices.some(
+                (invoice) => invoice.number === result.invoice.number,
+              );
+              const totalMinor =
+                result.workbookTotalMinor ??
+                result.invoice.items.reduce(
+                  (sum, item) =>
+                    sum + Math.round(item.quantity * item.unitPriceMinor),
+                  0,
+                ) +
+                  result.invoice.containers *
+                    result.invoice.freightPerContainerMinor;
+              const valid =
+                result.invoice.number &&
+                result.invoice.date &&
+                result.customer.company &&
+                result.invoice.items.length > 0;
+              return (
+                <article
+                  className={valid ? "import-result" : "import-result invalid"}
+                  key={`${result.sourceName}-${result.sheetName}-${index}`}
+                >
+                  <div className="import-result-head">
+                    <span><FileSpreadsheet /></span>
+                    <div>
+                      <strong>
+                        {result.invoice.number
+                          ? `PI-${result.invoice.number}`
+                          : "Invoice number missing"}
+                      </strong>
+                      <small>
+                        {result.sourceName} · {result.sheetName}
+                      </small>
+                    </div>
+                    <b className={existing ? "update" : "new"}>
+                      {existing ? "Update" : "New"}
+                    </b>
+                  </div>
+                  <div className="import-result-grid">
+                    <p><span>Customer</span><strong>{result.customer.company || "—"}</strong></p>
+                    <p><span>Date</span><strong>{result.invoice.date || "—"}</strong></p>
+                    <p><span>Items</span><strong>{result.invoice.items.length}</strong></p>
+                    <p><span>Total</span><strong>{currency(totalMinor, result.invoice.currency)}</strong></p>
+                  </div>
+                  {result.warnings.length > 0 && (
+                    <ul>
+                      {result.warnings.map((warning) => (
+                        <li key={warning}>{warning}</li>
+                      ))}
+                    </ul>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="modal-actions import-actions">
+          <button className="secondary" onClick={onClose} disabled={saving}>
+            Cancel
+          </button>
+          <button
+            className="primary"
+            onClick={() => void confirmImport()}
+            disabled={!uniqueValidResults.length || reading || saving}
+          >
+            {saving ? "Saving…" : `Import ${uniqueValidResults.length || ""} invoice${uniqueValidResults.length === 1 ? "" : "s"}`}
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }
 function InvoiceBuilder({
