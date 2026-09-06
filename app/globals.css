@@ -1339,6 +1339,7 @@ body {
     background: #fff !important;
   }
   body::before,
+  .arabic-hover-helper,
   .topbar,
   .sidebar,
   .detail-toolbar,
